@@ -58,15 +58,14 @@ class FrozenAgent:
         next_obs: tuple[int, int, bool],
     ):
         """Updates the Q-value of an action."""
-        future_q_value = (not terminated) * np.max(self.q_values[next_obs])
-        temporal_difference = (
-            reward + self.discount_factor * future_q_value - self.q_values[obs][action]
-        )
 
-        self.q_values[obs][action] = (
-            self.q_values[obs][action] + self.lr * temporal_difference
-        )
-        self.training_error.append(temporal_difference)
+        if terminated == True:
+            target_function = reward
+
+        else:
+            target_function = reward + self.discount_factor * np.max(self.q_values[next_obs][action])
+
+        future_q_value = (1 - self.lr) * self.q_values[obs][action] + self.lr * target_function
 
     def decay_epsilon(self):
         self.epsilon = max(self.final_epsilon, self.epsilon - self.epsilon_decay)
@@ -75,7 +74,7 @@ class FrozenAgent:
 
 # hyperparameters
 learning_rate = 0.01
-n_episodes = 100
+n_episodes = 50000
 start_epsilon = 1.0
 epsilon_decay = start_epsilon / (n_episodes / 2)  # reduce the exploration over time
 final_epsilon = 0.1
@@ -95,6 +94,7 @@ agent = FrozenAgent(
 for episode in tqdm(range(n_episodes)):
     obs, info = env.reset()
     done = False
+    steps_counter = 0
 
     # play one episode
     while not done:
@@ -107,6 +107,9 @@ for episode in tqdm(range(n_episodes)):
         # update if the environment is done and the current obs
         done = terminated or truncated
         obs = next_obs
+
+        if (steps_counter > 100):
+            break
 
     agent.decay_epsilon()
 
