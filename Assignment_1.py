@@ -128,30 +128,49 @@ def average_over_groups(RewData, group_size=100):
 def plot_results(reward_set1, reward_set2, reward_set3, 
                  steps_set1, steps_set2, steps_set3, group_size=100):
     
-    fig, ax = plt.subplots(3,3, figsize=(10, 8))
+    fig, ax = plt.subplots(2,3, figsize=(10, 6))
+    fig.suptitle('Hyper-Parameters Tuning', fontsize=16)
 
-    plt.subplot(3, 3, 1)
+    plt.subplot(2, 3, 1)
+    plt.title('Learning Rate = 0.8, Epsilon = 0.4')
+    plt.ylabel('Rewards (Avg of 50 episods)')
+    plt.xlabel('Episode')
     plt.plot(np.arange(0, n_episodes, group_size), average_over_groups(reward_set1))
     plt.grid()
 
-    plt.subplot(3, 3, 2)
-    plt.plot(np.arange(0, n_episodes, group_size), average_over_groups(reward_set2))
-    plt.grid()
-
-    plt.subplot(3, 3, 3)
-    plt.plot(np.arange(0, n_episodes, group_size), average_over_groups(reward_set3))
-    plt.grid()
-
-    plt.subplot(3, 3, 4)
+    plt.subplot(2, 3, 4)
+    #plt.title('Learning Rate = 0.8')
+    plt.ylabel('Stpes (Avg of 50 episods)')
+    plt.xlabel('Episode')
     plt.plot(np.arange(0, n_episodes, group_size), average_over_groups(steps_set1))
     plt.grid()
-    
-    plt.subplot(3, 3, 5)
-    plt.plot(np.arange(0, n_episodes, group_size), average_over_groups(steps_set2))
+
+    plt.subplot(2, 3, 2)
+    plt.title('Learning Rate = 0.5, Epsilon = 0.4')
+    plt.ylabel('Rewards (Avg of 50 episods)')
+    plt.xlabel('Episode')
+    plt.plot(np.arange(0, n_episodes, group_size), average_over_groups(reward_set2), color='r')
     plt.grid()
 
-    plt.subplot(3, 3, 6)
-    plt.plot(np.arange(0, n_episodes, group_size), average_over_groups(steps_set3))
+    plt.subplot(2, 3, 5)
+    #plt.title('Learning Rate = 0.5')
+    plt.ylabel('Stpes (Avg of 50 episods)')
+    plt.xlabel('Episode')
+    plt.plot(np.arange(0, n_episodes, group_size), average_over_groups(steps_set2), color='r')
+    plt.grid()
+    
+    plt.subplot(2, 3, 3)
+    plt.title('Learning Rate = 0.2, Epsilon = 0.4')
+    plt.ylabel('Rewards (Avg of 50 episods)')
+    plt.xlabel('Episode')
+    plt.plot(np.arange(0, n_episodes, group_size), average_over_groups(reward_set3), color='g')
+    plt.grid()
+
+    plt.subplot(2, 3, 6)
+    #plt.title('Learning Rate = 0.2')
+    plt.ylabel('Stpes (Avg of 50 episods)')
+    plt.xlabel('Episode')
+    plt.plot(np.arange(0, n_episodes, group_size), average_over_groups(steps_set3), color='g')
     plt.grid()
 
     plt.tight_layout()
