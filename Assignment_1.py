@@ -57,63 +57,144 @@ class FrozenAgent:
         terminated: bool,
         next_obs: tuple[int, int, bool],
     ):
-        """Updates the Q-value of an action."""
+        """Updates the Q-value of an action, 
+        based on the Q-Learning algorithm written 
+        in the assginment: "Figure 3 - Q-learning algorithm """
 
         if terminated == True:
             target_function = reward
 
         else:
-            target_function = reward + self.discount_factor * np.max(self.q_values[next_obs][action])
+            target_function = reward + self.discount_factor * np.max(self.q_values[next_obs])
 
-        future_q_value = (1 - self.lr) * self.q_values[obs][action] + self.lr * target_function
+        self.q_values[obs][action] = (1 - self.lr) * self.q_values[obs][action] + self.lr * target_function
 
     def decay_epsilon(self):
         self.epsilon = max(self.final_epsilon, self.epsilon - self.epsilon_decay)
 
-#####
 
-# hyperparameters
-learning_rate = 0.01
-n_episodes = 50000
-start_epsilon = 1.0
-epsilon_decay = start_epsilon / (n_episodes / 2)  # reduce the exploration over time
-final_epsilon = 0.1
+# Main function for playing the game
+def run_game(agent):
+
+    # Initialize lists
+    eps_rewards_list = []
+    steps_list = []
+
+    for episode in tqdm(range(n_episodes)):
+        obs, info = env.reset()
+        done = False
+        steps_counter = 0
+        total_rewards_eps = 0
+
+        # play one episode
+        while not done:
+            action = agent.get_action(obs)
+            next_obs, reward, terminated, truncated, info = env.step(action)
+            total_rewards_eps += reward
+
+            # update the agent
+            agent.update(obs, action, reward, terminated, next_obs)
+
+            # update if the environment is done and the current obs
+            done = terminated or truncated
+            obs = next_obs
+
+            steps_counter += 1
+            if (steps_counter > 100):
+                break
+            if terminated and reward == 0:  # term for failing
+                steps_counter = 100
+
+        agent.decay_epsilon()
+
+        eps_rewards_list.append(total_rewards_eps)
+        steps_list.append(steps_counter)
+
+    return eps_rewards_list, steps_list
+
+
+# Function for making the average over a defined amount
+def average_over_groups(RewData, group_size=100):
+    averages = [] # Initialize list
+
+    for i in range(0, len(RewData), group_size):
+        group = RewData[i:(i-1) + group_size]
+        averages.append(np.mean(group))
+
+    return averages
+
+
+# Function for plotting the results
+def plot_results(reward_set1, reward_set2, reward_set3, 
+                 steps_set1, steps_set2, steps_set3, group_size=100):
+    
+    fig, ax = plt.subplots(3,3, figsize=(10, 8))
+
+    plt.subplot(3, 3, 1)
+    plt.plot(np.arange(0, n_episodes, group_size), average_over_groups(reward_set1))
+    plt.grid()
+
+    plt.subplot(3, 3, 2)
+    plt.plot(np.arange(0, n_episodes, group_size), average_over_groups(reward_set2))
+    plt.grid()
+
+    plt.subplot(3, 3, 3)
+    plt.plot(np.arange(0, n_episodes, group_size), average_over_groups(reward_set3))
+    plt.grid()
+
+    plt.subplot(3, 3, 4)
+    plt.plot(np.arange(0, n_episodes, group_size), average_over_groups(steps_set1))
+    plt.grid()
+    
+    plt.subplot(3, 3, 5)
+    plt.plot(np.arange(0, n_episodes, group_size), average_over_groups(steps_set2))
+    plt.grid()
+
+    plt.subplot(3, 3, 6)
+    plt.plot(np.arange(0, n_episodes, group_size), average_over_groups(steps_set3))
+    plt.grid()
+
+    plt.tight_layout()
+    plt.show()
+
+
+# Define number of episodes
+n_episodes = 5000
+group_size = 100
 
 # Create a new game environment
 env = gym.make('FrozenLake-v1', desc=None, map_name="4x4", is_slippery=True, render_mode="rgb_array")
-observation, info = env.reset()
 
-agent = FrozenAgent(
+# Define agents with different hyper-parameters
+agent1 = FrozenAgent(
     env=env,
-    learning_rate=learning_rate,
-    initial_epsilon=start_epsilon,
-    epsilon_decay=epsilon_decay,
-    final_epsilon=final_epsilon,
+    learning_rate=0.2,
+    initial_epsilon = 0.8,
+    epsilon_decay = 0.8 / (n_episodes / 2),  # reduce the exploration over time
+    final_epsilon=0.1
+)
+agent2 = FrozenAgent(
+    env=env,
+    learning_rate=0.5,
+    initial_epsilon = 0.8,
+    epsilon_decay = 0.8 / (n_episodes / 2),  # reduce the exploration over time
+    final_epsilon=0.1
+)
+agent3 = FrozenAgent(
+    env=env,
+    learning_rate=0.8,
+    initial_epsilon = 0.8,
+    epsilon_decay = 0.8 / (n_episodes / 2),  # reduce the exploration over time
+    final_epsilon=0.1
 )
 
-for episode in tqdm(range(n_episodes)):
-    obs, info = env.reset()
-    done = False
-    steps_counter = 0
+# Running the agents over the game
+agent1_rewards, agent1_steps = run_game(agent1)
+agent2_rewards, agent2_steps = run_game(agent2)
+agent3_rewards, agent3_steps = run_game(agent3)
 
-    # play one episode
-    while not done:
-        action = agent.get_action(obs)
-        next_obs, reward, terminated, truncated, info = env.step(action)
+plot_results(agent1_rewards, agent2_rewards, agent3_rewards, agent1_steps, agent2_steps, agent3_steps)
 
-        # update the agent
-        agent.update(obs, action, reward, terminated, next_obs)
-
-        # update if the environment is done and the current obs
-        done = terminated or truncated
-        obs = next_obs
-
-        if (steps_counter > 100):
-            break
-
-    agent.decay_epsilon()
-
-env.close()
 
 
 
