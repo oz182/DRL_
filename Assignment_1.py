@@ -3,6 +3,7 @@ import gymnasium as gym
 from collections import defaultdict
 from tqdm import tqdm
 from matplotlib import pyplot as plt
+import pandas as pd
 
 class FrozenAgent:
     def __init__(
@@ -178,7 +179,26 @@ def plot_results(reward_set1, reward_set2, reward_set3,
 
 
 def plotRewardsColormap(BestAgent):
-    print(BestAgent.Q)
+    # Convert the Q-values dictionary to a DataFrame
+    q_values_df = pd.DataFrame.from_dict(BestAgent.q_values, orient='index', columns=['Left', 'Down', 'Right', 'Up'])
+    
+    # Create a colormap visualization
+    plt.figure(figsize=(10, 6))
+    plt.imshow(q_values_df, aspect='auto', cmap='viridis')
+    plt.colorbar(label='Q-Value')
+    plt.xlabel('Actions')
+    plt.ylabel('States')
+    plt.title('Colormap of Q-Values for Frozen Lake Environment')
+    plt.xticks(ticks=np.arange(len(q_values_df.columns)), labels=q_values_df.columns)
+    plt.yticks(ticks=np.arange(len(q_values_df.index)), labels=q_values_df.index)
+
+    # Add the Q-values inside each color block for better readability
+    for i in range(q_values_df.shape[0]):
+        for j in range(q_values_df.shape[1]):
+            plt.text(j, i, f"{q_values_df.iloc[i, j]:.2f}", ha='center', va='center', 
+                     color='white' if q_values_df.iloc[i, j] < 0.5 else 'black')
+            
+    plt.show()
 
 
 # Define number of episodes
@@ -212,11 +232,11 @@ agent3 = FrozenAgent(
 )
 
 # Running the agents over the game
-agent1_rewards, agent1_steps = run_game(agent1)
+#agent1_rewards, agent1_steps = run_game(agent1)
 agent2_rewards, agent2_steps = run_game(agent2)
-agent3_rewards, agent3_steps = run_game(agent3)
+#agent3_rewards, agent3_steps = run_game(agent3)
 
-plot_results(agent1_rewards, agent2_rewards, agent3_rewards, agent1_steps, agent2_steps, agent3_steps)
+#plot_results(agent1_rewards, agent2_rewards, agent3_rewards, agent1_steps, agent2_steps, agent3_steps)
 
 plotRewardsColormap(agent2)
 
