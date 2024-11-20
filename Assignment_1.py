@@ -132,7 +132,7 @@ def plot_results(reward_set1, reward_set2, reward_set3,
     fig.suptitle('Hyper-Parameters Tuning', fontsize=16)
 
     plt.subplot(2, 3, 1)
-    plt.title('Learning Rate = 0.8, Epsilon = 0.4')
+    plt.title('Learning Rate = 0.4,\nEpsilon decay = 0.3')
     plt.ylabel('Rewards (Avg of 50 episods)')
     plt.xlabel('Episode')
     plt.plot(np.arange(0, n_episodes, group_size), average_over_groups(reward_set1))
@@ -146,7 +146,7 @@ def plot_results(reward_set1, reward_set2, reward_set3,
     plt.grid()
 
     plt.subplot(2, 3, 2)
-    plt.title('Learning Rate = 0.5, Epsilon = 0.4')
+    plt.title('Learning Rate = 0.6,\nEpsilon decay = 0.9')
     plt.ylabel('Rewards (Avg of 50 episods)')
     plt.xlabel('Episode')
     plt.plot(np.arange(0, n_episodes, group_size), average_over_groups(reward_set2), color='r')
@@ -160,7 +160,7 @@ def plot_results(reward_set1, reward_set2, reward_set3,
     plt.grid()
     
     plt.subplot(2, 3, 3)
-    plt.title('Learning Rate = 0.2, Epsilon = 0.4')
+    plt.title('Learning Rate = 0.8,\nEpsilon decay = 0.5')
     plt.ylabel('Rewards (Avg of 50 episods)')
     plt.xlabel('Episode')
     plt.plot(np.arange(0, n_episodes, group_size), average_over_groups(reward_set3), color='g')
@@ -187,23 +187,23 @@ env = gym.make('FrozenLake-v1', desc=None, map_name="4x4", is_slippery=True, ren
 # Define agents with different hyper-parameters
 agent1 = FrozenAgent(
     env=env,
-    learning_rate=0.2,
+    learning_rate=0.4,
     initial_epsilon = 0.8,
-    epsilon_decay = 0.8 / (n_episodes / 2),  # reduce the exploration over time
+    epsilon_decay = 0.3 / (n_episodes / 2),  # reduce the exploration over time
     final_epsilon=0.1
 )
 agent2 = FrozenAgent(
     env=env,
-    learning_rate=0.5,
+    learning_rate=0.6,
     initial_epsilon = 0.8,
-    epsilon_decay = 0.8 / (n_episodes / 2),  # reduce the exploration over time
+    epsilon_decay = 0.9 / (n_episodes / 2),  # reduce the exploration over time
     final_epsilon=0.1
 )
 agent3 = FrozenAgent(
     env=env,
     learning_rate=0.8,
     initial_epsilon = 0.8,
-    epsilon_decay = 0.8 / (n_episodes / 2),  # reduce the exploration over time
+    epsilon_decay = 0.5 / (n_episodes / 2),  # reduce the exploration over time
     final_epsilon=0.1
 )
 
