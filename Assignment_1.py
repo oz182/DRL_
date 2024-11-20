@@ -140,7 +140,7 @@ def plot_results(reward_set1, reward_set2, reward_set3,
 
     plt.subplot(2, 3, 4)
     #plt.title('Learning Rate = 0.8')
-    plt.ylabel('Stpes (Avg of 100 episods)')
+    plt.ylabel('Steps (Avg of 100 episods)')
     plt.xlabel('Episode')
     plt.plot(np.arange(0, n_episodes, group_size), average_over_groups(steps_set1))
     plt.grid()
@@ -154,7 +154,7 @@ def plot_results(reward_set1, reward_set2, reward_set3,
 
     plt.subplot(2, 3, 5)
     #plt.title('Learning Rate = 0.5')
-    plt.ylabel('Stpes (Avg of 100 episods)')
+    plt.ylabel('Steps (Avg of 100 episods)')
     plt.xlabel('Episode')
     plt.plot(np.arange(0, n_episodes, group_size), average_over_groups(steps_set2), color='r')
     plt.grid()
@@ -168,13 +168,17 @@ def plot_results(reward_set1, reward_set2, reward_set3,
 
     plt.subplot(2, 3, 6)
     #plt.title('Learning Rate = 0.2')
-    plt.ylabel('Stpes (Avg of 100 episods)')
+    plt.ylabel('Steps (Avg of 100 episods)')
     plt.xlabel('Episode')
     plt.plot(np.arange(0, n_episodes, group_size), average_over_groups(steps_set3), color='g')
     plt.grid()
 
     plt.tight_layout()
     plt.show()
+
+
+def plotRewardsColormap(BestAgent):
+    print(BestAgent.Q)
 
 
 # Define number of episodes
@@ -213,6 +217,8 @@ agent2_rewards, agent2_steps = run_game(agent2)
 agent3_rewards, agent3_steps = run_game(agent3)
 
 plot_results(agent1_rewards, agent2_rewards, agent3_rewards, agent1_steps, agent2_steps, agent3_steps)
+
+plotRewardsColormap(agent2)
 
 
 
