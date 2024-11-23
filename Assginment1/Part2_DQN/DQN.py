@@ -1,6 +1,6 @@
 import gymnasium as gym
 
-env = gym.make("CartPole-v1", render_mode='rgb_array')
+env = gym.make("CartPole-v1", render_mode='human')
 env.reset()
 env.render()
 state_dim = env.observation_space.shape[0]  # 4-dimensional state
