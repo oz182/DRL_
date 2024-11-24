@@ -7,10 +7,11 @@ from collections import deque
 import random
 
 env = gym.make("CartPole-v1", render_mode='human')
-env.reset()
-env.render()
+#env.reset()
+#env.render()
 state_dim = env.observation_space.shape[0]  # 4-dimensional state
 action_dim = env.action_space.n  # 2 possible actions
+
 
 class QNetwork(nn.Module):
     def __init__(self, state_dim, action_dim):
@@ -27,3 +28,41 @@ class QNetwork(nn.Module):
         x = torch.relu(self.fc3(x))
         x = torch.relu(self.fc4(x))
         return self.fc5(x)  # Output Q-values for all actions
+    
+
+class ReplayBuffer:
+    # Class for creating and hendling the expiriance buffer for the
+    # network training. Deque object is used to replace old expiriance with new ones
+    # while maintaining a fixed size.
+
+    # Initialzie buffer with a maximum size
+    def __init__(self, maxlen=10000):
+        self.buffer = deque(maxlen=maxlen)
+
+    def add(self, transition):
+        self.buffer.append(transition)
+
+    # Get a sample (of a defined size) from the que
+    def sample(self, batch_size):
+
+        # Sample a batch of tarnsition from the buffer
+        batch = random.sample(self.buffer, batch_size)
+
+        # "zip(*batch)" is used to zip together all the arrtibutes of one sample from the 
+        # batch (the '*' sign is used to unpack the tuples of 1 sample in to componants)
+        states, actions, rewards, next_states, dones = zip(*batch)
+        
+        # Each componant is then converted into a pytorch tensor for handling with torch module
+        return (
+            torch.tensor(states, dtype=torch.float32),
+            torch.tensor(actions, dtype=torch.int64),
+            torch.tensor(rewards, dtype=torch.float32),
+            torch.tensor(next_states, dtype=torch.float32),
+            torch.tensor(dones, dtype=torch.float32),
+        )
+
+    def __len__(self):
+        return len(self.buffer)
+    
+
+
