@@ -6,12 +6,6 @@ import torch.optim as optim
 from collections import deque
 import random
 
-env = gym.make("CartPole-v1", render_mode='human')
-#env.reset()
-#env.render()
-state_dim = env.observation_space.shape[0]  # 4-dimensional state
-action_dim = env.action_space.n  # 2 possible actions
-
 
 class QNetwork(nn.Module):
     def __init__(self, state_dim, action_dim):
@@ -65,4 +59,44 @@ class ReplayBuffer:
         return len(self.buffer)
     
 
+def compute_loss(q_network, target_network, replay_buffer, batch_size, gamma):
+    states, actions, rewards, next_states, dones = replay_buffer.sample(batch_size)
 
+    # Current Q-values
+    q_values = q_network(states) # A tensor representing the Q-values predicted by the Q-network for all possible actions, given a batch of states.
+    q_values = q_values.gather(1, actions.unsqueeze(1)).squeeze(1) 
+
+    # Target Q-values
+    with torch.no_grad():
+        next_q_values = target_network(next_states).max(1)[0]
+        target_q_values = rewards + gamma * next_q_values * (1 - dones)
+
+    # Loss: Mean Squared Error
+    loss = nn.MSELoss()(q_values, target_q_values)
+    return loss
+
+
+env = gym.make("CartPole-v1", render_mode='human')
+#env.reset()
+#env.render()
+state_dim = env.observation_space.shape[0]  # 4-dimensional state
+action_dim = env.action_space.n  # 2 possible actions
+
+
+# Hyperparameters
+episodes = 500
+batch_size = 64
+gamma = 0.99
+learning_rate = 1e-3
+target_update_freq = 10  # Update target network every 10 episodes
+epsilon_start, epsilon_end, epsilon_decay = 1.0, 0.01, 500
+
+# Initialize networks, optimizer, and replay buffer
+q_network = QNetwork(state_dim, action_dim)
+target_network = QNetwork(state_dim, action_dim)
+target_network.load_state_dict(q_network.state_dict())  # Sync target with Q-network
+optimizer = optim.Adam(q_network.parameters(), lr=learning_rate)
+replay_buffer = ReplayBuffer()
+
+# Epsilon-greedy exploration
+epsilon = epsilon_start
