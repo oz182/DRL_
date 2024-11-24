@@ -64,10 +64,10 @@ def compute_loss(q_network, target_network, replay_buffer, batch_size, gamma):
 
     # Current Q-values
     q_values = q_network(states) # A tensor representing the Q-values predicted by the Q-network for all possible actions, given a batch of states.
-    q_values = q_values.gather(1, actions.unsqueeze(1)).squeeze(1) 
+    q_values = q_values.gather(1, actions.unsqueeze(1)).squeeze(1) # Extract the Q-value corresponding to the action taken by the agent for each state in the batch.
 
     # Target Q-values
-    with torch.no_grad():
+    with torch.no_grad(): # No need for a gradient calculation
         next_q_values = target_network(next_states).max(1)[0]
         target_q_values = rewards + gamma * next_q_values * (1 - dones)
 
