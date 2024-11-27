@@ -219,8 +219,10 @@ def training_loop(env, agent, Qnet_A, Qnet_B, Memo, T, num_episodes, Criterion, 
             # Sample an action
             if is_A:
                 action = Agent.sample_action(state, Qnet_A)
+                policy_net = Qnet_A
             elif is_B:
                 action = Agent.sample_action(state, Qnet_B)
+                policy_net = Qnet_B
 
             # Perform action in the environment
             observation, reward, terminated, truncated, info = env.step(action)
