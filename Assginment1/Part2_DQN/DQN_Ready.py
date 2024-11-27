@@ -17,7 +17,7 @@ device = torch.device(
     "mps" if torch.backends.mps.is_available() else
     "cpu"
 )
-device="cpu"
+device="cpu"  # Apperantly running better than mps
 
 
 class DQN(nn.Module):
@@ -42,7 +42,7 @@ class DQN(nn.Module):
 
 class Extended_DQN(nn.Module):
     def __init__(self, input_size, hidden_size, output_size):
-        super(DQN, self).__init__()
+        super(Extended_DQN, self).__init__()
         # Define layers
         self.L1 = nn.Linear(input_size, hidden_size[0])
 
@@ -85,7 +85,7 @@ class ExperienceReplay:
 def warmup_buffer(env, Expriance_buffer, warmup_steps=1000):
 
     # --- Warm-Up Period ---
-    warmup_steps = 500 # Number of steps for warm-up
+    warmup_steps = 1000 # Number of steps for warm-up
     state, _ = env.reset()
     state = torch.tensor(state, dtype=torch.float32, device=device).unsqueeze(0)
 
@@ -239,15 +239,15 @@ def draw_graphs(num_episodes, rewards, losses):
     plt.show()
 
 
-def test_agent(env, agent, policy_net):
-    
-    state, info = env.reset()
+def test_agent(agent, policy_net):
+    Rendered_env = gym.make('CartPole-v1', render_mode='human')
+    state, info =Rendered_env.reset()
 
     # Sample an action
     action = Agent.sample_action(state, policy_net)
 
     # Perform action in the environment
-    observation, reward, terminated, truncated, info = env.step(action)
+    observation, reward, terminated, truncated, info = Rendered_env.step(action)
     done = terminated or truncated
 
     while not done:
@@ -257,29 +257,29 @@ def test_agent(env, agent, policy_net):
         action = Agent.sample_action(state, policy_net)
 
         # Perform action in the environment
-        observation, reward, terminated, truncated, info = env.step(action)
+        observation, reward, terminated, truncated, info = Rendered_env.step(action)
         done = terminated or truncated
 
-        env.render()
+        Rendered_env.render()
         
 
 
 ## main ##
 
 #parameters
-discount_factor = 0.9
+discount_factor = 0.99
 LR = 0.001
 initial_epsilon = 0.99
 Final_epsilon = 0.01
-Epsilon_decay = 0.9995
-Batch_size = 500
+Epsilon_decay = 0.9998
+Batch_size = 1000
 learning_rate=0.001
 
 # Create the environment (CartPole-v1)
 env = gym.make('CartPole-v1', render_mode='rgb_array')
 
 # Define the replay buffer capacity
-Capacity = 100000
+Capacity = 10000
 
 # Initialize the experience replay buffer
 Memo = ExperienceReplay(Capacity, device)
@@ -288,10 +288,10 @@ Memo = warmup_buffer(env, Memo)
 # Get number of actions from gym action space
 n_actions = 2
 n_observations = 4
-hid_layers= [128, 64, 64]
+hid_layers= [128, 64, 32, 64, 128]
 C=300
-policy_net = DQN(n_observations,hid_layers, n_actions).to(device)
-target_net = DQN(n_observations,hid_layers, n_actions).to(device)
+policy_net = Extended_DQN(n_observations,hid_layers, n_actions).to(device)
+target_net = Extended_DQN(n_observations,hid_layers, n_actions).to(device)
 target_net.load_state_dict(policy_net.state_dict())
 
 optimizer = optim.AdamW(policy_net.parameters(), lr=LR, amsgrad=True)
@@ -306,10 +306,10 @@ loss_per_episode = []
 
 policy_net, reward_per_episode, loss_per_episode = training_loop(env, Agent, policy_net, target_net, Memo, T, num_episodes, Criterion, optimizer, reward_per_episode, loss_per_episode)
 
-Rendered_env = gym.make('CartPole-v1', render_mode='human')
-test_agent(Rendered_env, Agent, policy_net)
 
-#draw_graphs(num_episodes, reward_per_episode, loss_per_episode)
+#test_agent(Agent, policy_net)
+
+draw_graphs(num_episodes, reward_per_episode, loss_per_episode)
 
 
 
