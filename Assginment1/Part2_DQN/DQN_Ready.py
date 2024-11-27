@@ -10,14 +10,13 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 
-
 # if GPU is to be used
 device = torch.device(
     "cuda" if torch.cuda.is_available() else
     "mps" if torch.backends.mps.is_available() else
     "cpu"
 )
-device="cpu"  # Apperantly running better than mps
+device = "cpu"
 
 
 class DQN(nn.Module):
@@ -73,19 +72,18 @@ class ExperienceReplay:
     def __len__(self):
         return len(self.memory)
 
-    def push(self, state,action,next_state,reward,done):
+    def push(self, state, action, next_state, reward, done):
         """Store a transition in the buffer."""
-        self.memory.append((state, action, next_state,reward,done))
+        self.memory.append((state, action, next_state, reward, done))
 
     def sample(self, batch_size):
         """Sample a batch of transitions."""
         return random.sample(self.memory, batch_size)
-    
-    
-def warmup_buffer(env, Expriance_buffer, warmup_steps=1000):
 
+
+def warmup_buffer(env, Expriance_buffer, warmup_steps=1000):
     # --- Warm-Up Period ---
-    warmup_steps = 1000 # Number of steps for warm-up
+    warmup_steps = 500  # Number of steps for warm-up
     state, _ = env.reset()
     state = torch.tensor(state, dtype=torch.float32, device=device).unsqueeze(0)
 
@@ -96,7 +94,8 @@ def warmup_buffer(env, Expriance_buffer, warmup_steps=1000):
         done = terminated or truncated
         observation = torch.tensor(observation, dtype=torch.float32, device=device).unsqueeze(0)
         Expriance_buffer.push(state, action, observation, reward, done)
-        state = observation if not done else torch.tensor(env.reset()[0], dtype=torch.float32, device=device).unsqueeze(0)
+        state = observation if not done else torch.tensor(env.reset()[0], dtype=torch.float32, device=device).unsqueeze(
+            0)
     print("Warm-up complete.")
 
     return Expriance_buffer
@@ -104,13 +103,13 @@ def warmup_buffer(env, Expriance_buffer, warmup_steps=1000):
 
 class DQN_agent():
     def __init__(
-        self,
-        env: gym.Env,
-        learning_rate: float,
-        initial_epsilon: float,
-        epsilon_decay: float,
-        final_epsilon: float,
-        discount_factor: float = 0.99,
+            self,
+            env: gym.Env,
+            learning_rate: float,
+            initial_epsilon: float,
+            epsilon_decay: float,
+            final_epsilon: float,
+            discount_factor: float = 0.99,
     ):
         self.env = env
         self.lr = learning_rate
@@ -132,7 +131,6 @@ class DQN_agent():
             with torch.no_grad():
                 return model(obs).argmax(dim=1).item()  # Greedy action
 
-
     def decay_epsilon(self):
         self.epsilon = max(self.final_epsilon, self.epsilon * self.epsilon_decay)
 
@@ -142,7 +140,7 @@ def batch2tensors(batch):
     :param batch: batch of tuples of past random transitions
     :return: tensors vectors for each thing-states, actions, rewards, next_states, dones
     """
-    states, actions, next_states, rewards,dones = zip(*batch)
+    states, actions, next_states, rewards, dones = zip(*batch)
     states = torch.cat(states)
     actions = torch.tensor(actions, dtype=torch.long, device=device)
     rewards = torch.tensor(rewards, dtype=torch.float32, device=device)
@@ -152,10 +150,9 @@ def batch2tensors(batch):
 
 
 def train(policy_net, target_net, optimizer, criterion, discount_factor, num_batch, Memo):
-
     states, actions, rewards, next_states, dones = batch2tensors(Memo.sample(num_batch))
 
-    q_values = policy_net(states).gather(1, actions.unsqueeze(1)).squeeze(1) # Q-values for taken actions
+    q_values = policy_net(states).gather(1, actions.unsqueeze(1)).squeeze(1)  # Q-values for taken actions
     next_q_values = target_net(next_states).max(1).values.detach()  # Detach target values
 
     targets = rewards + discount_factor * next_q_values * (1 - dones)
@@ -167,10 +164,35 @@ def train(policy_net, target_net, optimizer, criterion, discount_factor, num_bat
     optimizer.step()
     return loss.item()
 
+def doubleQ_train(policy_net, target_net, optimizer, criterion, discount_factor, num_batch, Memo):
+    Q_A = policy_net
+    Q_B = target_net
 
-def training_loop(env, agent, policy_net, target_net, Memo, T, num_episodes, Criterion, optimizer, reward_per_episode, loss_per_episode):
+    q_A_values = Q_A(states).gather(1, actions.unsqueeze(1)).squeeze(1)  # Q-values for taken actions - A
+    q_B_values = Q_B(states).gather(1, actions.unsqueeze(1)).squeeze(1)  # Q-values for taken actions - B
+    
+    a_star = Q_A(next_states).max(1).values.detach()
+    b_star = Q_B(next_states).max(1).values.detach()
+
+    states, actions, rewards, next_states, dones = batch2tensors(Memo.sample(num_batch))
+
+    if np.random.random() < 0.5: # Start with A
+        pass
+        #targets = rewards + discount_factor * next_q_values * (1 - dones)
+
+    #loss = criterion(q_values, targets)
+    loss = 0
+
+    optimizer.zero_grad()
+    loss.backward()
+    optimizer.step()
+    return loss.item()
+
+
+def training_loop(env, agent, policy_net, target_net, Memo, T, num_episodes, Criterion, optimizer, reward_per_episode,
+                  loss_per_episode):
     # Loop for training the agent
-    count=0
+    count = 0
     for i_episode in range(num_episodes):
         state, info = env.reset()
         state = torch.tensor(state, dtype=torch.float32, device=device).unsqueeze(0)
@@ -179,7 +201,7 @@ def training_loop(env, agent, policy_net, target_net, Memo, T, num_episodes, Cri
         episode_loss = 0  # Variable to accumulate the loss for the episode
 
         for t in range(T):
-            count+=1
+            count += 1
             # Sample an action
             action = Agent.sample_action(state, policy_net)
 
@@ -197,57 +219,71 @@ def training_loop(env, agent, policy_net, target_net, Memo, T, num_episodes, Cri
 
             # Train the policy network if enough samples are available
             if len(Memo) > Batch_size:
-                Loss = train(policy_net, target_net, optimizer, Criterion, discount_factor, Batch_size, Memo)
-                episode_loss += Loss  # Accumulate the loss for the current episode
+                Loss = train(policy_net, target_net, optimizer, Criterion, discount_factor, Batch_size,
+                             Memo)  # Accumulate the loss for the current episode
+                loss_per_episode.append(Loss)  # Average loss for the episode
 
                 # Update target network periodically
                 if count % C == 0:
                     target_net.load_state_dict(policy_net.state_dict())
 
-            if done or t ==499:
+            if done or t == 499:
                 # Store the total reward and average loss for this episode
                 reward_per_episode.append(total_reward)
-                loss_per_episode.append(episode_loss / (t + 1))  # Average loss for the episode
                 break
         # Print the current loss for the episode and step
         print(f"The current loss for episode {i_episode} and step {total_reward} is: {Loss}")
+        avg_100_episode = sum(reward_per_episode[-100:]) / len(reward_per_episode[-100:])
+        if avg_100_episode > 475:
+            return policy_net, reward_per_episode, loss_per_episode
 
     return policy_net, reward_per_episode, loss_per_episode
 
 
-def draw_graphs(num_episodes, rewards, losses):
+def draw_graphs(rewards, losses):
     # Create the plot
     plt.figure(figsize=(12, 6))
 
     # Plot average rewards
     plt.subplot(1, 2, 1)
-    plt.plot(list(range(1, num_episodes + 1)), rewards)
+    plt.plot(list(range(1, len(rewards) + 1)), rewards, label='Rewards per episode')
+
+    # Add mean for every 10 episodes
+    reward_rolling_mean = np.convolve(rewards, np.ones(25) / 25, mode='valid')  # Rolling mean with a window of 10
+    plt.plot(range(25, len(rewards) + 1), reward_rolling_mean, label='25 Episode Mean', color='red', linestyle='--')
+
     plt.xlabel('Episodes')
     plt.ylabel('Reward')
     plt.title('Reward per episode')
     plt.grid()
+    plt.legend()
 
     # Plot average losses
     plt.subplot(1, 2, 2)
-    plt.plot(list(range(1, num_episodes + 1)), losses, color='r')
-    plt.xlabel('Episodes')
+    plt.plot(list(range(1, len(losses) + 1)), losses, color='r', label='Loss per step')
+
+    # Add mean for every 200 steps
+    loss_rolling_mean = np.convolve(losses, np.ones(1000) / 1000, mode='valid')  # Rolling mean with a window of 200
+    plt.plot(range(1000, len(losses) + 1), loss_rolling_mean, label='1000 Step Mean', color='blue', linestyle='--')
+
+    plt.xlabel('Steps')
     plt.ylabel('Loss')
-    plt.title('Loss per episode')
+    plt.title('Loss every step')
     plt.grid()
+    plt.legend()
 
     plt.tight_layout()
     plt.show()
 
 
-def test_agent(agent, policy_net):
-    Rendered_env = gym.make('CartPole-v1', render_mode='human')
-    state, info =Rendered_env.reset()
+def test_agent(env, agent, policy_net):
+    state, info = env.reset()
 
     # Sample an action
     action = Agent.sample_action(state, policy_net)
 
     # Perform action in the environment
-    observation, reward, terminated, truncated, info = Rendered_env.step(action)
+    observation, reward, terminated, truncated, info = env.step(action)
     done = terminated or truncated
 
     while not done:
@@ -257,23 +293,22 @@ def test_agent(agent, policy_net):
         action = Agent.sample_action(state, policy_net)
 
         # Perform action in the environment
-        observation, reward, terminated, truncated, info = Rendered_env.step(action)
+        observation, reward, terminated, truncated, info = env.step(action)
         done = terminated or truncated
 
-        Rendered_env.render()
-        
+        env.render()
 
 
 ## main ##
 
 #parameters
 discount_factor = 0.99
-LR = 0.001
-initial_epsilon = 0.99
-Final_epsilon = 0.01
-Epsilon_decay = 0.9998
-Batch_size = 1000
-learning_rate=0.001
+LR = 0.0005
+initial_epsilon = 1
+Final_epsilon = 0.005
+Epsilon_decay = 0.9995
+Batch_size = 256
+learning_rate = 0.01
 
 # Create the environment (CartPole-v1)
 env = gym.make('CartPole-v1', render_mode='rgb_array')
@@ -288,45 +323,45 @@ Memo = warmup_buffer(env, Memo)
 # Get number of actions from gym action space
 n_actions = 2
 n_observations = 4
-hid_layers= [128, 64, 32, 64, 128]
-C=300
-policy_net = Extended_DQN(n_observations,hid_layers, n_actions).to(device)
-target_net = Extended_DQN(n_observations,hid_layers, n_actions).to(device)
+
+C = 100
+#Normal DQN
+#hid_layers= [64, 64, 16]
+#policy_net = DQN(n_observations,hid_layers, n_actions).to(device)
+#target_net = DQN(n_observations,hid_layers, n_actions).to(device)
+
+# Double - DQN
+#hid_layers= [64, 64, 16]
+#Qnet_A = DQN(n_observations,hid_layers, n_actions).to(device)
+#Qnet_B = DQN(n_observations,hid_layers, n_actions).to(device)
+
+# Adjust naming for functions
+#policy_net = Qnet_A
+#target_net = Qnet_B
+
+#Extended_DQN
+hid_layers = [64, 64, 32, 32, 16]
+policy_net = Extended_DQN(n_observations, hid_layers, n_actions).to(device)
+target_net = Extended_DQN(n_observations, hid_layers, n_actions).to(device)
 target_net.load_state_dict(policy_net.state_dict())
 
 optimizer = optim.AdamW(policy_net.parameters(), lr=LR, amsgrad=True)
-Criterion=nn.MSELoss()
-num_episodes=200
-T=700
-Agent=DQN_agent(env,learning_rate,initial_epsilon,Epsilon_decay,Final_epsilon,discount_factor)
+Criterion = nn.MSELoss()
+num_episodes = 700
+T = 500
+Agent = DQN_agent(env, learning_rate, initial_epsilon, Epsilon_decay, Final_epsilon, discount_factor)
 #Loss=1
 # List to store rewards and losses for each episode
 reward_per_episode = []
 loss_per_episode = []
 
-policy_net, reward_per_episode, loss_per_episode = training_loop(env, Agent, policy_net, target_net, Memo, T, num_episodes, Criterion, optimizer, reward_per_episode, loss_per_episode)
+policy_net, reward_per_episode, loss_per_step = training_loop(env, Agent, policy_net, target_net, Memo, T, num_episodes,
+                                                              Criterion, optimizer, reward_per_episode,
+                                                              loss_per_episode)
 
+#Rendered_env = gym.make('CartPole-v1', render_mode='rg')
+#test_agent(Rendered_env, Agent, policy_net)
 
-#test_agent(Agent, policy_net)
+# Add test on 100 episods and plot rewards
 
-draw_graphs(num_episodes, reward_per_episode, loss_per_episode)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+draw_graphs(reward_per_episode, loss_per_episode)
