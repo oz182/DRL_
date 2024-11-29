@@ -10,6 +10,8 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 
+from EvaluateAgent import *
+
 # if GPU is to be used
 device = torch.device(
     "cuda" if torch.cuda.is_available() else
@@ -376,8 +378,9 @@ policy_net, reward_per_episode, loss_per_step = training_loop(env, Agent, Qnet_A
                                                               loss_per_episode)
 
 #Rendered_env = gym.make('CartPole-v1', render_mode='rg')
-#test_agent(Rendered_env, Agent, policy_net)
+#test_agent(Rendered_env, Agent, policy_net)  # plot live game once
 
-# Add test on 100 episods and plot rewards
+test_rewards = evaluate_agent(env, policy_net, num_episodes=100)
+plot_test_rewards(test_rewards)
 
 draw_graphs(reward_per_episode, loss_per_episode)
