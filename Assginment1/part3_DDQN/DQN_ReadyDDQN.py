@@ -164,9 +164,11 @@ def train(policy_net, target_net, optimizer, criterion, discount_factor, num_bat
     optimizer.step()
     return loss.item()
 
-def doubleQ_train(policy_net, target_net, optimizer, criterion, discount_factor, num_batch, Memo):
+def doubleQ_train(policy_net, target_net, optimizerA, optimizerB, criterion, discount_factor, num_batch, Memo):
     Q_A = policy_net
     Q_B = target_net
+
+    states, actions, rewards, next_states, dones = batch2tensors(Memo.sample(num_batch))
 
     q_A_values = Q_A(states).gather(1, actions.unsqueeze(1)).squeeze(1)  # Q-values for taken actions - A
     q_B_values = Q_B(states).gather(1, actions.unsqueeze(1)).squeeze(1)  # Q-values for taken actions - B
@@ -174,22 +176,32 @@ def doubleQ_train(policy_net, target_net, optimizer, criterion, discount_factor,
     a_star = Q_A(next_states).max(1).values.detach()
     b_star = Q_B(next_states).max(1).values.detach()
 
-    states, actions, rewards, next_states, dones = batch2tensors(Memo.sample(num_batch))
+    A_active = 0
+    B_active = 0
 
     if np.random.random() < 0.5: # Start with A
-        pass
-        #targets = rewards + discount_factor * next_q_values * (1 - dones)
+        targetTerm_A = rewards + discount_factor * b_star * (1 - dones)
+        loss = criterion(q_A_values, targetTerm_A)
 
-    #loss = criterion(q_values, targets)
-    loss = 0
+        optimizerA.zero_grad()
+        loss.backward()
+        optimizerA.step()
+        A_active = 1
 
-    optimizer.zero_grad()
-    loss.backward()
-    optimizer.step()
-    return loss.item()
+    else:  # Select B
+        targetTerm_B = rewards + discount_factor * a_star * (1 - dones)
+        loss = criterion(q_B_values, targetTerm_B)
+
+        optimizerB.zero_grad()
+        loss.backward()
+        optimizerB.step()
+
+        B_active = 1
+
+    return loss.item(), A_active, B_active
 
 
-def training_loop(env, agent, policy_net, target_net, Memo, T, num_episodes, Criterion, optimizer, reward_per_episode,
+def training_loop(env, agent, Qnet_A, Qnet_B, Memo, T, num_episodes, Criterion, optimizerA, optimizerB, reward_per_episode,
                   loss_per_episode):
     # Loop for training the agent
     count = 0
@@ -200,10 +212,17 @@ def training_loop(env, agent, policy_net, target_net, Memo, T, num_episodes, Cri
         total_reward = 0
         episode_loss = 0  # Variable to accumulate the loss for the episode
 
+        is_A = True
+
         for t in range(T):
             count += 1
             # Sample an action
-            action = Agent.sample_action(state, policy_net)
+            if is_A:
+                action = Agent.sample_action(state, Qnet_A)
+                policy_net = Qnet_A
+            elif is_B:
+                action = Agent.sample_action(state, Qnet_B)
+                policy_net = Qnet_B
 
             # Perform action in the environment
             observation, reward, terminated, truncated, info = env.step(action)
@@ -219,13 +238,13 @@ def training_loop(env, agent, policy_net, target_net, Memo, T, num_episodes, Cri
 
             # Train the policy network if enough samples are available
             if len(Memo) > Batch_size:
-                Loss = train(policy_net, target_net, optimizer, Criterion, discount_factor, Batch_size,
+                Loss, is_A, is_B = doubleQ_train(Qnet_A, Qnet_B, optimizerA, optimizerB, Criterion, discount_factor, Batch_size,
                              Memo)  # Accumulate the loss for the current episode
                 loss_per_episode.append(Loss)  # Average loss for the episode
 
                 # Update target network periodically
-                if count % C == 0:
-                    target_net.load_state_dict(policy_net.state_dict())
+                #if count % C == 0:
+                    #target_net.load_state_dict(policy_net.state_dict())
 
             if done or t == 499:
                 # Store the total reward and average loss for this episode
@@ -331,21 +350,18 @@ C = 100
 #target_net = DQN(n_observations,hid_layers, n_actions).to(device)
 
 # Double - DQN
-#hid_layers= [64, 64, 16]
-#Qnet_A = DQN(n_observations,hid_layers, n_actions).to(device)
-#Qnet_B = DQN(n_observations,hid_layers, n_actions).to(device)
-
-# Adjust naming for functions
-#policy_net = Qnet_A
-#target_net = Qnet_B
+hid_layers= [64, 64, 16]
+Qnet_A = DQN(n_observations,hid_layers, n_actions).to(device)
+Qnet_B = DQN(n_observations,hid_layers, n_actions).to(device)
 
 #Extended_DQN
-hid_layers = [64, 64, 32, 32, 16]
-policy_net = Extended_DQN(n_observations, hid_layers, n_actions).to(device)
-target_net = Extended_DQN(n_observations, hid_layers, n_actions).to(device)
-target_net.load_state_dict(policy_net.state_dict())
+#hid_layers = [64, 64, 32, 32, 16]
+#policy_net = Extended_DQN(n_observations, hid_layers, n_actions).to(device)
+#target_net = Extended_DQN(n_observations, hid_layers, n_actions).to(device)
+#target_net.load_state_dict(policy_net.state_dict())
 
-optimizer = optim.AdamW(policy_net.parameters(), lr=LR, amsgrad=True)
+optimizerA = optim.AdamW(Qnet_A.parameters(), lr=LR, amsgrad=True)
+optimizerB = optim.AdamW(Qnet_B.parameters(), lr=LR, amsgrad=True)
 Criterion = nn.MSELoss()
 num_episodes = 700
 T = 500
@@ -355,8 +371,8 @@ Agent = DQN_agent(env, learning_rate, initial_epsilon, Epsilon_decay, Final_epsi
 reward_per_episode = []
 loss_per_episode = []
 
-policy_net, reward_per_episode, loss_per_step = training_loop(env, Agent, policy_net, target_net, Memo, T, num_episodes,
-                                                              Criterion, optimizer, reward_per_episode,
+policy_net, reward_per_episode, loss_per_step = training_loop(env, Agent, Qnet_A, Qnet_B, Memo, T, num_episodes,
+                                                              Criterion, optimizerA, optimizerB, reward_per_episode,
                                                               loss_per_episode)
 
 #Rendered_env = gym.make('CartPole-v1', render_mode='rg')
