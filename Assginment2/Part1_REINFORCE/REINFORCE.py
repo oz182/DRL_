@@ -22,7 +22,9 @@ class PolicyNet(nn.Module):
         # Storage for log probabilities and rewards
         self.saved_log_probs = []
         self.rewards = []
-        self.SavedStates = []
+
+        # Storage for state values
+        self.saved_values = []
 
     def forward(self, x):
         x = self.activation(self.fc1(x))
@@ -55,18 +57,16 @@ def optimize_net(policy_net, optimizer, discount_factor):
 
     # Convert to a tensor and normalize
     G_t = torch.tensor(G_t, dtype=torch.float32)
-    print (G_t[0])
-    G_t = (G_t - G_t.mean()) / (G_t.std() + 1e-5) if len(G_t) > 1 else G_t
+    #G_t = (G_t - G_t.mean()) / (G_t.std() + 1e-5) if len(G_t) > 1 else G_t
     
     # Compute policy loss
     policy_loss = []
     for log_prob, reward in zip(policy_net.saved_log_probs, G_t):
         policy_loss.append(-log_prob * reward)
 
-    policy_loss = torch.stack(policy_loss).sum()
-
     # Perform backpropagation and optimization
     optimizer.zero_grad()
+    policy_loss = torch.stack(policy_loss).sum()
     policy_loss.backward()
     optimizer.step()
 
@@ -75,43 +75,50 @@ def optimize_net(policy_net, optimizer, discount_factor):
     del policy_net.rewards[:]
 
 
-def optimize_with_baseline(policy_net, value_net, EstimatedValue, optimizer, value_optimizer, discount_factor):
+# Optimize the policy network based on REINFORCE with baseline algorithm
+def optimize_with_baseline(policy_net, value_net, optimizer, value_optimizer, discount_factor):
     R = 0
     G_t = deque()
-
-    # Compute cumulative discounted rewards in reverse
     for r in policy_net.rewards[::-1]:
         R = r + discount_factor * R
         G_t.appendleft(R)
 
-    # Convert to a tensor and normalize
     G_t = torch.tensor(G_t, dtype=torch.float32)
-    print (G_t[0])
-    G_t = (G_t - G_t.mean()) / (G_t.std() + 1e-5) if len(G_t) > 1 else G_t
 
-    # Value net backpropagation
-    loss = nn.MSELoss(EstimatedValue, G_t)
+    # Optimize value network (baseline)
+    state_values = torch.stack(value_net.saved_values).squeeze()
+    value_loss = F.mse_loss(state_values.squeeze(), G_t)
     value_optimizer.zero_grad()
-    loss.backward()
+    value_loss.backward()
     value_optimizer.step()
 
-    delta = G_t - value_net()
-    
-    # Compute policy loss
+    # Policy loss using advantage (G_t - baseline)
+    advantage = G_t - state_values.squeeze().detach()
     policy_loss = []
-    for log_prob, reward in zip(policy_net.saved_log_probs, G_t):
-        policy_loss.append(-log_prob * reward)
+    for log_prob, adv in zip(policy_net.saved_log_probs, advantage):
+        policy_loss.append(-log_prob * adv)
 
-    policy_loss = torch.stack(policy_loss).sum()
-
-    # Perform backpropagation and optimization
     optimizer.zero_grad()
-    policy_loss.backward()
+    torch.stack(policy_loss).sum().backward()
     optimizer.step()
 
-    # Clear saved log probabilities and rewards
+    # Clear saved data
     del policy_net.saved_log_probs[:]
     del policy_net.rewards[:]
+    del value_net.saved_values[:]
+
+
+# Plot the rewards over time
+def plot_rewards(rewards):
+    plt.figure(figsize=(12, 6))
+    #plt.plot(rewards, label='REINFORCE', alpha=0.7)
+    plt.plot(rewards, label='REINFORCE with baseline', alpha=0.7)
+    plt.xlabel('Episodes')
+    plt.ylabel('Total Rewards')
+    #plt.title('REINFORCE')
+    plt.title('REINFORCE with Baseline')
+    plt.legend()
+    plt.show()
 
 
 # Main training loop
@@ -130,7 +137,9 @@ def main():
     # Initialize value net for baseline
     value_net = PolicyNet(4, [16, 8], 1)
     value_optimizer = optim.AdamW(value_net.parameters(), lr=learning_rate)
-    EstimatedValue = []
+    
+    rewards = []
+    episode_rewards = []
 
     for episode in range(max_episodes):
         state, _ = env.reset()
@@ -140,24 +149,31 @@ def main():
             action = select_action(policy_net, state)
             next_state, reward, done, truncated, _ = env.step(action)
 
+            # Save value of state (only with baseline)
+            value_net.saved_values.append(value_net(state))
+
             # Save reward and move to the next state
             policy_net.rewards.append(reward)
-            EstimatedValue.append(value_net(state))  # Save state for use as a baseline
             state = torch.tensor(next_state, dtype=torch.float32)
 
             if done or truncated:
                 break
 
         # Optimize policy after the episode
-        optimize_net(policy_net, optimizer, discount_factor)
+        #episode_rewards = policy_net.rewards
+        #rewards.append(sum(episode_rewards))
+        #optimize_net(policy_net, optimizer, discount_factor)
 
         # Optimize policy after the episode using baseline REINFORCE
-        optimize_with_baseline(policy_net, value_net, EstimatedValue, optimizer, value_optimizer, discount_factor)
+        episode_rewards = policy_net.rewards
+        rewards.append(sum(episode_rewards))
+        optimize_with_baseline(policy_net, value_net, optimizer, value_optimizer, discount_factor)
 
         # Log progress
-        print(f"Episode {episode + 1} completed")
+        print(f"Episode {episode + 1}: Rewards={rewards[-1]}")
 
-    print("Training finished!")
+    print("Training complete!")
+    plot_rewards(rewards)
 
 
 if __name__ == "__main__":
