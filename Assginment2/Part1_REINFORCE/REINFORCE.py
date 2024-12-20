@@ -111,8 +111,8 @@ def optimize_with_baseline(policy_net, value_net, optimizer, value_optimizer, di
 # Plot the rewards over time
 def plot_rewards(rewards):
     plt.figure(figsize=(12, 6))
-    #plt.plot(rewards, label='REINFORCE', alpha=0.7)
-    plt.plot(rewards, label='REINFORCE with baseline', alpha=0.7)
+    plt.plot(rewards, label='REINFORCE', alpha=0.7)
+    #plt.plot(rewards, label='REINFORCE with baseline', alpha=0.7)
     plt.xlabel('Episodes')
     plt.ylabel('Total Rewards')
     #plt.title('REINFORCE')
@@ -126,7 +126,7 @@ def main():
     # Hyperparameters
     max_episodes = 1000
     max_steps = 500
-    learning_rate = 0.005
+    learning_rate = 0.001
     discount_factor = 0.999
 
     # Initialize environment and policy network
@@ -160,14 +160,17 @@ def main():
                 break
 
         # Optimize policy after the episode
-        #episode_rewards = policy_net.rewards
-        #rewards.append(sum(episode_rewards))
-        #optimize_net(policy_net, optimizer, discount_factor)
+        episode_rewards = policy_net.rewards
+        rewards.append(sum(episode_rewards))
+        optimize_net(policy_net, optimizer, discount_factor)
+        
 
         # Optimize policy after the episode using baseline REINFORCE
+        """
         episode_rewards = policy_net.rewards
         rewards.append(sum(episode_rewards))
         optimize_with_baseline(policy_net, value_net, optimizer, value_optimizer, discount_factor)
+        """
 
         # Log progress
         print(f"Episode {episode + 1}: Rewards={rewards[-1]}")
