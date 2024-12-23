@@ -92,8 +92,10 @@ def main():
     learning_rate = 0.001
     discount_factor = 0.999
 
-    # Initialize environment and policy network
+    # Initialzie environment
     env = gym.make('CartPole-v1', render_mode=None)
+
+    # Initialize policy network and optimizer
     policy_net = PolicyNet(4, [16, 8], 2)
     optimizer = optim.AdamW(policy_net.parameters(), lr=learning_rate)
 
