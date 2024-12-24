@@ -9,6 +9,8 @@ from torch.distributions import Categorical
 
 import matplotlib.pyplot as plt
 
+LEARNING_RATE = 0.001
+DISCOUNT_FACTOR = 0.999
 
 # Define the policy network
 class PolicyNet(nn.Module):
@@ -42,52 +44,42 @@ def select_action(policy_net, state):
 
     # Save the log probability of the chosen action
     policy_net.saved_log_probs.append(log_prob)
-    return action.item()
+    return action.item(), log_prob
 
 
-def train_Qnet(Q_net, Q_optimizer, state, next_state, action, reward):
-    q_values = policy_net(states).gather(1, actions.unsqueeze(1)).squeeze(1)  # Q-values for taken actions
-    next_q_values = target_net(next_states).max(1).values.detach()  # Detach target values
+def train_Qnet(Q_net, Q_optimizer, state, next_state, action, reward, done):
+    q_values = Q_net(state).gather(1, action.unsqueeze(1)).squeeze(1)  # Q-values for taken actions
+    next_q_values = Q_net(next_state).max(1).values.detach()  # Detach target values
 
-    targets = rewards + discount_factor * next_q_values * (1 - dones)
+    targets = reward + DISCOUNT_FACTOR * next_q_values * (1 - done)
 
-    loss = criterion(q_values, targets)
+    loss = F.mse_loss(q_values, targets)
 
-    optimizer.zero_grad()
+    Q_optimizer.zero_grad()
     loss.backward()
-    optimizer.step()
+    Q_optimizer.step()
     return loss.item()
 
 
 # Optimize the policy network based on A2C algorithm
-def optimize_actor_critic(policy_net, value_net, Q_net, optimizer, value_optimizer, Q_optimizer, state, next_state, action, reward, discount_factor):
+def optimize_actor_critic(policy_net, value_net, Q_net, optimizer, value_optimizer, Q_optimizer, state, next_state, action, log_prob, reward):
 
-    train_Qnet(Q_net, Q_optimizer, state, next_state, action, reward)
-
-    q_value = Q_net(state).gather(1, policy_net(state))  # Q-values for the policy taken action
+    q_value = Q_net(state).gather(1, action)  # Q-values for the policy taken action
     v_value = value_net(state)  # Value of the state
     advantage = q_value - v_value  # Advantage
 
     # Optimize value network
-    value_loss = F.mse_loss(v_value, )
+    value_loss = -(v_value * advantage * DISCOUNT_FACTOR * LEARNING_RATE)
     value_optimizer.zero_grad()
     value_loss.backward()
     value_optimizer.step()
 
     # Policy loss using advantage 
-    advantage = G_t - state_values.squeeze().detach()
-    policy_loss = []
-    for log_prob, adv in zip(policy_net.saved_log_probs, advantage):
-        policy_loss.append(-log_prob * adv)
+    policy_loss = -log_prob * advantage
 
     optimizer.zero_grad()
-    torch.stack(policy_loss).sum().backward()
+    policy_loss.backward()
     optimizer.step()
-
-    # Clear saved data
-    del policy_net.saved_log_probs[:]
-    del policy_net.rewards[:]
-    del value_net.saved_values[:]
 
 
 # Plot the rewards over time
@@ -106,23 +98,21 @@ def main():
     # Hyperparameters
     max_episodes = 1000
     max_steps = 500
-    learning_rate = 0.001
-    discount_factor = 0.999
 
     # Initialzie environment
     env = gym.make('CartPole-v1', render_mode=None)
 
     # Initialize policy network and optimizer
     policy_net = PolicyNet(4, [16, 8], 2)
-    optimizer = optim.AdamW(policy_net.parameters(), lr=learning_rate)
+    optimizer = optim.AdamW(policy_net.parameters(), lr=LEARNING_RATE)
 
     # Initialize Q network and optimizer
     Q_net = PolicyNet(4, [16, 8], 2)
-    Q_optimizer = optim.AdamW(Q_net.parameters(), lr=learning_rate)
+    Q_optimizer = optim.AdamW(Q_net.parameters(), lr=LEARNING_RATE)
 
     # Initialize value network and optimizer
     value_net = PolicyNet(4, [16, 8], 1)
-    value_optimizer = optim.AdamW(value_net.parameters(), lr=learning_rate)
+    value_optimizer = optim.AdamW(value_net.parameters(), lr=LEARNING_RATE)
     
     rewards = []
     episode_rewards = []
@@ -132,10 +122,11 @@ def main():
         state = torch.tensor(state, dtype=torch.float32)
 
         for step in range(max_steps):
-            action = select_action(policy_net, state)
+            action, log_prob = select_action(policy_net, state)
             next_state, reward, done, truncated, _ = env.step(action)
             
-            optimize_actor_critic(policy_net, value_net, Q_net, optimizer, value_optimizer, state, action, discount_factor)
+            optimize_actor_critic(policy_net, value_net, Q_net, optimizer, value_optimizer, state, action, log_prob)
+            train_Qnet(Q_net, Q_optimizer, state, next_state, action, reward, done)
 
             state = torch.tensor(next_state, dtype=torch.float32)
 
