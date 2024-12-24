@@ -48,7 +48,8 @@ def select_action(policy_net, state):
 
 
 def train_Qnet(Q_net, Q_optimizer, state, next_state, action, reward, done):
-    q_values = Q_net(state).gather(1, action.unsqueeze(1)).squeeze(1)  # Q-values for taken actions
+    action_tensor = torch.tensor(action, dtype=torch.long).unsqueeze(0)
+    q_values = Q_net(state).gather(0, action_tensor)  # Q-values for taken actions
     next_q_values = Q_net(next_state).max(1).values.detach()  # Detach target values
 
     targets = reward + DISCOUNT_FACTOR * next_q_values * (1 - done)
@@ -62,20 +63,22 @@ def train_Qnet(Q_net, Q_optimizer, state, next_state, action, reward, done):
 
 
 # Optimize the policy network based on A2C algorithm
-def optimize_actor_critic(policy_net, value_net, Q_net, optimizer, value_optimizer, Q_optimizer, state, next_state, action, log_prob, reward):
+def optimize_actor_critic(value_net, Q_net, optimizer, value_optimizer, state, action, log_prob):
 
-    q_value = Q_net(state).gather(1, action)  # Q-values for the policy taken action
+    action_tensor = torch.tensor(action, dtype=torch.long).unsqueeze(0)
+    q_value = Q_net(state).gather(0, action_tensor)  # Q-values for the policy taken action
+
     v_value = value_net(state)  # Value of the state
     advantage = q_value - v_value  # Advantage
 
     # Optimize value network
     value_loss = -(v_value * advantage * DISCOUNT_FACTOR * LEARNING_RATE)
     value_optimizer.zero_grad()
-    value_loss.backward()
+    value_loss.backward(retain_graph=True)
     value_optimizer.step()
 
     # Policy loss using advantage 
-    policy_loss = -log_prob * advantage
+    policy_loss = -log_prob * advantage.detach()
 
     optimizer.zero_grad()
     policy_loss.backward()
@@ -125,7 +128,7 @@ def main():
             action, log_prob = select_action(policy_net, state)
             next_state, reward, done, truncated, _ = env.step(action)
             
-            optimize_actor_critic(policy_net, value_net, Q_net, optimizer, value_optimizer, state, action, log_prob)
+            optimize_actor_critic(value_net, Q_net, optimizer, value_optimizer, state, action, log_prob)
             train_Qnet(Q_net, Q_optimizer, state, next_state, action, reward, done)
 
             state = torch.tensor(next_state, dtype=torch.float32)
