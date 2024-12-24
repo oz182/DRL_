@@ -9,7 +9,7 @@ from torch.distributions import Categorical
 
 import matplotlib.pyplot as plt
 
-LEARNING_RATE = 0.001
+LEARNING_RATE = 0.01
 DISCOUNT_FACTOR = 0.999
 
 # Define the policy network
@@ -101,7 +101,7 @@ def optimize_actor_critic(value_net, Q_net, optimizer, value_optimizer, state, a
     value_optimizer.step()
 
     # Policy loss using advantage 
-    policy_loss = -log_prob * advantage.detach()
+    policy_loss = -log_prob * advantage.detach() * DISCOUNT_FACTOR * LEARNING_RATE
 
     optimizer.zero_grad()
     policy_loss.backward()
