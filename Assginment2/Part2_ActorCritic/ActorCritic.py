@@ -45,9 +45,26 @@ def select_action(policy_net, state):
     return action.item()
 
 
-# Optimize the policy network based on REINFORCE with baseline algorithm
-def optimize_actor_critic(policy_net, value_net, optimizer, value_optimizer, state, action, discount_factor):
-    q_value = policy_net(state).gather(1, action)  # Q-values for the policy taken action
+def train_Qnet(Q_net, Q_optimizer, state, next_state, action, reward):
+    q_values = policy_net(states).gather(1, actions.unsqueeze(1)).squeeze(1)  # Q-values for taken actions
+    next_q_values = target_net(next_states).max(1).values.detach()  # Detach target values
+
+    targets = rewards + discount_factor * next_q_values * (1 - dones)
+
+    loss = criterion(q_values, targets)
+
+    optimizer.zero_grad()
+    loss.backward()
+    optimizer.step()
+    return loss.item()
+
+
+# Optimize the policy network based on A2C algorithm
+def optimize_actor_critic(policy_net, value_net, Q_net, optimizer, value_optimizer, Q_optimizer, state, next_state, action, reward, discount_factor):
+
+    train_Qnet(Q_net, Q_optimizer, state, next_state, action, reward)
+
+    q_value = Q_net(state).gather(1, policy_net(state))  # Q-values for the policy taken action
     v_value = value_net(state)  # Value of the state
     advantage = q_value - v_value  # Advantage
 
@@ -57,7 +74,7 @@ def optimize_actor_critic(policy_net, value_net, optimizer, value_optimizer, sta
     value_loss.backward()
     value_optimizer.step()
 
-    # Policy loss using advantage (G_t - baseline)
+    # Policy loss using advantage 
     advantage = G_t - state_values.squeeze().detach()
     policy_loss = []
     for log_prob, adv in zip(policy_net.saved_log_probs, advantage):
@@ -117,9 +134,10 @@ def main():
         for step in range(max_steps):
             action = select_action(policy_net, state)
             next_state, reward, done, truncated, _ = env.step(action)
-            state = torch.tensor(next_state, dtype=torch.float32)
+            
+            optimize_actor_critic(policy_net, value_net, Q_net, optimizer, value_optimizer, state, action, discount_factor)
 
-            optimize_actor_critic(policy_net, value_net, optimizer, value_optimizer, state, action, discount_factor)
+            state = torch.tensor(next_state, dtype=torch.float32)
 
             if done or truncated:
                 break
