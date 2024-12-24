@@ -21,18 +21,43 @@ class PolicyNet(nn.Module):
         self.fc3 = nn.Linear(hidden_sizes[1], output_size)
         self.activation = nn.ReLU()
 
-        # Storage for log probabilities and rewards
-        self.saved_log_probs = []
-        self.rewards = []
-
-        # Storage for state values
-        self.saved_values = []
-
     def forward(self, x):
         x = self.activation(self.fc1(x))
         x = self.activation(self.fc2(x))
         x = self.fc3(x)
         return F.softmax(x, dim=-1)  # Softmax across the last dimension
+    
+
+# Define the policy network
+class QNet(nn.Module):
+    def __init__(self, input_size, hidden_sizes, output_size):
+        super(QNet, self).__init__()
+        self.fc1 = nn.Linear(input_size, hidden_sizes[0])
+        self.fc2 = nn.Linear(hidden_sizes[0], hidden_sizes[1])
+        self.fc3 = nn.Linear(hidden_sizes[1], output_size)
+        self.activation = nn.ReLU()
+
+    def forward(self, x):
+        x = self.activation(self.fc1(x))
+        x = self.activation(self.fc2(x))
+        x = self.fc3(x)
+        return x  # Softmax across the last dimension
+    
+
+# Define the policy network
+class ValueNet(nn.Module):
+    def __init__(self, input_size, hidden_sizes, output_size):
+        super(ValueNet, self).__init__()
+        self.fc1 = nn.Linear(input_size, hidden_sizes[0])
+        self.fc2 = nn.Linear(hidden_sizes[0], hidden_sizes[1])
+        self.fc3 = nn.Linear(hidden_sizes[1], output_size)
+        self.activation = nn.ReLU()
+
+    def forward(self, x):
+        x = self.activation(self.fc1(x))
+        x = self.activation(self.fc2(x))
+        x = self.fc3(x)
+        return x  # Softmax across the last dimension
 
 
 # Select an action based on policy probabilities
@@ -42,15 +67,13 @@ def select_action(policy_net, state):
     action = action_dist.sample()
     log_prob = action_dist.log_prob(action)
 
-    # Save the log probability of the chosen action
-    policy_net.saved_log_probs.append(log_prob)
     return action.item(), log_prob
 
 
 def train_Qnet(Q_net, Q_optimizer, state, next_state, action, reward, done):
     action_tensor = torch.tensor(action, dtype=torch.long).unsqueeze(0)
     q_values = Q_net(state).gather(0, action_tensor)  # Q-values for taken actions
-    next_q_values = Q_net(next_state).max(1).values.detach()  # Detach target values
+    next_q_values = Q_net(torch.tensor(next_state)).max(0).values.detach()  # Detach target values
 
     targets = reward + DISCOUNT_FACTOR * next_q_values * (1 - done)
 
@@ -110,14 +133,14 @@ def main():
     optimizer = optim.AdamW(policy_net.parameters(), lr=LEARNING_RATE)
 
     # Initialize Q network and optimizer
-    Q_net = PolicyNet(4, [16, 8], 2)
+    Q_net = QNet(4, [16, 8], 2)
     Q_optimizer = optim.AdamW(Q_net.parameters(), lr=LEARNING_RATE)
 
     # Initialize value network and optimizer
-    value_net = PolicyNet(4, [16, 8], 1)
+    value_net = ValueNet(4, [16, 8], 1)
     value_optimizer = optim.AdamW(value_net.parameters(), lr=LEARNING_RATE)
     
-    rewards = []
+    rewards = 0
     episode_rewards = []
 
     for episode in range(max_episodes):
@@ -133,16 +156,15 @@ def main():
 
             state = torch.tensor(next_state, dtype=torch.float32)
 
-            if done or truncated:
-                break
-        
-        # Optimize policy after the episode using baseline REINFORCE
-        episode_rewards = policy_net.rewards
-        rewards.append(sum(episode_rewards))
+            rewards += reward
 
+            if done or truncated or step == max_steps - 1:
+                episode_rewards.append(rewards)
+                rewards = 0
+                break
      
         # Log progress
-        print(f"Episode {episode + 1}: Rewards={rewards[-1]}")
+        print(f"Episode {episode + 1}: Rewards={episode_rewards[-1]}")
 
     print("Training complete!")
     plot_rewards(rewards)
