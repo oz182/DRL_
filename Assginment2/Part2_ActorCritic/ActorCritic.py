@@ -56,25 +56,36 @@ def select_action(policy_net, state):
 
 
 # Optimize the policy network based on A2C algorithm
-def optimize_actor_critic(value_net, optimizer, value_optimizer, state, action, log_prob):
-
-    action_tensor = torch.tensor(action, dtype=torch.long).unsqueeze(0)
-
-    v_value = value_net(state)  # Value of the state
-    advantage = q_value - v_value  # Advantage
+def optimize_actor_critic(value_net, optimizer, value_optimizer, LossVector_value, LossVector_policy):
 
     # Optimize value network
-    value_loss = -(v_value * advantage * DISCOUNT_FACTOR)
+    value_loss = sum(LossVector_value) / len(LossVector_value)
     value_optimizer.zero_grad()
-    value_loss.backward(retain_graph=True)
+    value_loss.backward()
     value_optimizer.step()
 
     # Policy loss using advantage 
-    policy_loss = -log_prob * advantage.detach() * DISCOUNT_FACTOR
-
+    policy_loss = sum(LossVector_policy) / len(LossVector_policy)
     optimizer.zero_grad()
     policy_loss.backward()
     optimizer.step()
+
+
+def compute_loss(policy_net, value_net, state, action, reward, next_state, done, truncated, ImportanceSampling, log_prob):
+    action_tensor = torch.tensor(action, dtype=torch.long).unsqueeze(0)
+    reward = torch.tensor(reward, dtype=torch.float32).unsqueeze(0)
+    next_state = torch.tensor(next_state, dtype=torch.float32).unsqueeze(0)
+
+    td_target = reward + DISCOUNT_FACTOR * value_net(next_state) # TD Target
+    advantage = td_target - value_net(state) # Advantage
+
+    # Optimize value network
+    value_loss = -(value_net(state) * advantage * ImportanceSampling)
+
+    # Policy loss using advantage 
+    policy_loss = -log_prob * advantage.detach() * ImportanceSampling
+
+    return [policy_loss, value_loss]
 
 
 # Plot the rewards over time
@@ -109,23 +120,31 @@ def main():
     episode_rewards = []
 
     for episode in range(max_episodes):
+        ImportanceSampling = 1
+
+        LossVector_value = []
+        LossVector_policy = []
+
         state, _ = env.reset()
         state = torch.tensor(state, dtype=torch.float32)
 
         for step in range(max_steps):
             action, log_prob = select_action(policy_net, state)
             next_state, reward, done, truncated, _ = env.step(action)
-            
-            optimize_actor_critic(value_net, optimizer, value_optimizer, state, action, log_prob)
 
             state = torch.tensor(next_state, dtype=torch.float32)
-
             rewards += reward
+            ImportanceSampling *= DISCOUNT_FACTOR
+
+            LossVector_policy.append(compute_loss(policy_net, value_net, state, action, reward, next_state, done, truncated, ImportanceSampling, log_prob)[0])
+            LossVector_value.append(compute_loss(policy_net, value_net, state, action, reward, next_state, done, truncated, ImportanceSampling, log_prob)[1])
 
             if done or truncated or step == max_steps - 1:
                 episode_rewards.append(rewards)
                 rewards = 0
                 break
+        
+        optimize_actor_critic(value_net, optimizer, value_optimizer, LossVector_value, LossVector_policy)
      
         # Log progress
         print(f"Episode {episode + 1}: Rewards={episode_rewards[-1]}")
