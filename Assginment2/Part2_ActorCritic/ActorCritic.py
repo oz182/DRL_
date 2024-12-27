@@ -9,9 +9,9 @@ from torch.distributions import Categorical
 
 import matplotlib.pyplot as plt
 
-LEARNING_RATE_POLICY = 0.01
-LEARNING_RATE_VALUE = 0.01
-DISCOUNT_FACTOR = 0.999
+LEARNING_RATE_POLICY = 0.001
+LEARNING_RATE_VALUE = 0.001
+DISCOUNT_FACTOR = 0.99
 
 # Define the policy network
 class PolicyNet(nn.Module):
@@ -19,13 +19,15 @@ class PolicyNet(nn.Module):
         super(PolicyNet, self).__init__()
         self.fc1 = nn.Linear(input_size, hidden_sizes[0])
         self.fc2 = nn.Linear(hidden_sizes[0], hidden_sizes[1])
-        self.fc3 = nn.Linear(hidden_sizes[1], output_size)
+        self.fc3 = nn.Linear(hidden_sizes[1], hidden_sizes[2])
+        self.fc4 = nn.Linear(hidden_sizes[2], output_size)
         self.activation = nn.ReLU()
 
     def forward(self, x):
         x = self.activation(self.fc1(x))
         x = self.activation(self.fc2(x))
-        x = self.fc3(x)
+        x = self.activation(self.fc3(x))
+        x = self.fc4(x)
         return F.softmax(x, dim=-1)  # Softmax across the last dimension
     
 
@@ -35,13 +37,15 @@ class ValueNet(nn.Module):
         super(ValueNet, self).__init__()
         self.fc1 = nn.Linear(input_size, hidden_sizes[0])
         self.fc2 = nn.Linear(hidden_sizes[0], hidden_sizes[1])
-        self.fc3 = nn.Linear(hidden_sizes[1], output_size)
+        self.fc3 = nn.Linear(hidden_sizes[1], hidden_sizes[2])
+        self.fc4 = nn.Linear(hidden_sizes[2], output_size)
         self.activation = nn.ReLU()
 
     def forward(self, x):
         x = self.activation(self.fc1(x))
         x = self.activation(self.fc2(x))
-        x = self.fc3(x)
+        x = self.activation(self.fc3(x))
+        x = self.fc4(x)
         return x  # Softmax across the last dimension
 
 
@@ -72,18 +76,18 @@ def optimize_actor_critic(value_net, optimizer, value_optimizer, LossVector_valu
 
 
 def compute_loss(policy_net, value_net, state, action, reward, next_state, done, truncated, ImportanceSampling, log_prob):
-    action_tensor = torch.tensor(action, dtype=torch.long).unsqueeze(0)
-    reward = torch.tensor(reward, dtype=torch.float32).unsqueeze(0)
-    next_state = torch.tensor(next_state, dtype=torch.float32).unsqueeze(0)
+    action_tensor = torch.tensor(action, dtype=torch.long)
+    reward = torch.tensor(reward, dtype=torch.float32)
+    next_state = torch.tensor(next_state, dtype=torch.float32)
 
-    td_target = reward + DISCOUNT_FACTOR * value_net(next_state) # TD Target
-    advantage = td_target - value_net(state) # Advantage
+    td_target = reward + (1 - done) * DISCOUNT_FACTOR * value_net(next_state) # TD Target
+    advantage = td_target - value_net(state).detach() # Advantage
 
     # Optimize value network
-    value_loss = -(value_net(state) * advantage * ImportanceSampling)
+    value_loss = value_net(state) * advantage #* ImportanceSampling
 
     # Policy loss using advantage 
-    policy_loss = -log_prob * advantage.detach() * ImportanceSampling
+    policy_loss = log_prob * advantage.detach() #* ImportanceSampling
 
     return [policy_loss, value_loss]
 
@@ -109,17 +113,18 @@ def main():
     env = gym.make('CartPole-v1', render_mode=None)
 
     # Initialize policy network and optimizer
-    policy_net = PolicyNet(4, [16, 8], 2)
+    policy_net = PolicyNet(4, [256, 64, 32], 2)
     optimizer = optim.AdamW(policy_net.parameters(), lr=LEARNING_RATE_POLICY)
 
     # Initialize value network and optimizer
-    value_net = ValueNet(4, [16, 8], 1)
+    value_net = ValueNet(4, [512, 64, 32], 1)
     value_optimizer = optim.AdamW(value_net.parameters(), lr=LEARNING_RATE_VALUE)
     
     rewards = 0
     episode_rewards = []
 
     for episode in range(max_episodes):
+        
         ImportanceSampling = 1
 
         LossVector_value = []
@@ -150,7 +155,7 @@ def main():
         print(f"Episode {episode + 1}: Rewards={episode_rewards[-1]}")
 
     print("Training complete!")
-    plot_rewards(rewards)
+    plot_rewards(episode_rewards)
 
 
 if __name__ == "__main__":
