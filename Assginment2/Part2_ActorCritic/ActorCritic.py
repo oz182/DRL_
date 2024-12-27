@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 
 LEARNING_RATE_POLICY = 0.001
 LEARNING_RATE_VALUE = 0.001
-DISCOUNT_FACTOR = 0.99
+DISCOUNT_FACTOR = 0.999
 
 # Define the policy network
 class PolicyNet(nn.Module):
@@ -166,8 +166,10 @@ def main():
         
         value_loss_eps, policy_loss_eps = optimize_actor_critic(value_net, optimizer, value_optimizer, LossVector_value, LossVector_policy)
 
-        value_loss_all.append(value_loss_eps)
-        policy_loss_all.append(policy_loss_eps)
+        value_loss_all.append(float(value_loss_eps))
+        policy_loss_all.append(float(policy_loss_eps))
+
+        # Added average every 50 episodes
 
         # Log progress
         print(f"Episode {episode + 1}: Rewards={episode_rewards[-1]}")
