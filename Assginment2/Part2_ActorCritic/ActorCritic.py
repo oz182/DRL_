@@ -74,6 +74,8 @@ def optimize_actor_critic(value_net, optimizer, value_optimizer, LossVector_valu
     policy_loss.backward()
     optimizer.step()
 
+    return value_loss, policy_loss
+
 
 def compute_loss(policy_net, value_net, state, action, reward, next_state, done, truncated, ImportanceSampling, log_prob):
     action_tensor = torch.tensor(action, dtype=torch.long)
@@ -102,6 +104,17 @@ def plot_rewards(rewards):
     plt.legend()
     plt.show()
 
+# Plot the losses over time
+def plot_losses(policy_loss_all, value_loss_all):
+    plt.figure(figsize=(12, 6))
+    plt.plot(policy_loss_all, label='Policy Loss', alpha=0.7)
+    plt.plot(value_loss_all, label='Value Loss', alpha=0.7)
+    plt.xlabel('Episodes')
+    plt.ylabel('Loss')
+    plt.title('Advetage Actor-Critic')
+    plt.legend()
+    plt.show()
+
 
 # Main training loop
 def main():
@@ -115,10 +128,12 @@ def main():
     # Initialize policy network and optimizer
     policy_net = PolicyNet(4, [256, 64, 32], 2)
     optimizer = optim.AdamW(policy_net.parameters(), lr=LEARNING_RATE_POLICY)
+    policy_loss_all = []
 
     # Initialize value network and optimizer
     value_net = ValueNet(4, [512, 64, 32], 1)
     value_optimizer = optim.AdamW(value_net.parameters(), lr=LEARNING_RATE_VALUE)
+    value_loss_all = []
     
     rewards = 0
     episode_rewards = []
@@ -149,13 +164,17 @@ def main():
                 rewards = 0
                 break
         
-        optimize_actor_critic(value_net, optimizer, value_optimizer, LossVector_value, LossVector_policy)
-     
+        value_loss_eps, policy_loss_eps = optimize_actor_critic(value_net, optimizer, value_optimizer, LossVector_value, LossVector_policy)
+
+        value_loss_all.append(value_loss_eps)
+        policy_loss_all.append(policy_loss_eps)
+
         # Log progress
         print(f"Episode {episode + 1}: Rewards={episode_rewards[-1]}")
 
     print("Training complete!")
     plot_rewards(episode_rewards)
+    plot_losses(policy_loss_all, value_loss_all)
 
 
 if __name__ == "__main__":
