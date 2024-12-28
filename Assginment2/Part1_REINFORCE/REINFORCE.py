@@ -131,11 +131,11 @@ def main():
 
     # Initialize environment and policy network
     env = gym.make('CartPole-v1', render_mode=None)
-    policy_net = PolicyNet(4, [16, 8], 2)
+    policy_net = PolicyNet(4, [256, 32], 2)
     optimizer = optim.AdamW(policy_net.parameters(), lr=learning_rate)
 
     # Initialize value net for baseline
-    value_net = PolicyNet(4, [16, 8], 1)
+    value_net = PolicyNet(4, [256, 32], 1)
     value_optimizer = optim.AdamW(value_net.parameters(), lr=learning_rate)
     
     rewards = []

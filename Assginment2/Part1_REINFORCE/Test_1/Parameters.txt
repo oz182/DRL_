@@ -1,0 +1,8 @@
+    learning_rate = 0.0009
+    discount_factor = 0.999
+
+    policy_net = PolicyNet(4, [64, 32], 2)
+    value_net = PolicyNet(4, [64, 32], 1)
+
+
+    ***** The old results were with [16, 8] in the hidden layers
