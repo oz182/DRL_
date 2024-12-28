@@ -11,9 +11,9 @@ import matplotlib.pyplot as plt
 
 import os
 
-LEARNING_RATE_POLICY = 0.005
-LEARNING_RATE_VALUE = 0.005
-DISCOUNT_FACTOR = 0.995
+LEARNING_RATE_POLICY = 0.0009
+LEARNING_RATE_VALUE = 0.0009
+DISCOUNT_FACTOR = 0.999
 
 # Define the policy network
 class PolicyNet(nn.Module):
@@ -129,12 +129,12 @@ def main():
     env = gym.make('CartPole-v1', render_mode=None)
 
     # Initialize policy network and optimizer
-    policy_net = PolicyNet(4, [64, 64, 32], 2)
+    policy_net = PolicyNet(4, [256, 128, 32], 2)
     optimizer = optim.AdamW(policy_net.parameters(), lr=LEARNING_RATE_POLICY)
     policy_loss_all = []
 
     # Initialize value network and optimizer
-    value_net = ValueNet(4, [64, 64, 32], 1)
+    value_net = ValueNet(4, [256, 128, 32], 1)
     value_optimizer = optim.AdamW(value_net.parameters(), lr=LEARNING_RATE_VALUE)
     value_loss_all = []
     
