@@ -1,0 +1,6 @@
+Policy Net hidden_sizes = [256, 64, 32]
+Value Net hidden_sizes = [256, 64, 32]
+
+LEARNING_RATE_POLICY = 0.001
+LEARNING_RATE_VALUE = 0.001
+DISCOUNT_FACTOR = 0.999

@@ -9,9 +9,11 @@ from torch.distributions import Categorical
 
 import matplotlib.pyplot as plt
 
-LEARNING_RATE_POLICY = 0.001
-LEARNING_RATE_VALUE = 0.001
-DISCOUNT_FACTOR = 0.999
+import os
+
+LEARNING_RATE_POLICY = 0.005
+LEARNING_RATE_VALUE = 0.005
+DISCOUNT_FACTOR = 0.995
 
 # Define the policy network
 class PolicyNet(nn.Module):
@@ -94,7 +96,7 @@ def compute_loss(policy_net, value_net, state, action, reward, next_state, done,
     return [policy_loss, value_loss]
 
 
-# Plot the rewards over time
+# Plot the rewards over episodes
 def plot_rewards(rewards):
     plt.figure(figsize=(12, 6))
     plt.plot(rewards, label='Advetage Actor-Critic', alpha=0.7)
@@ -104,11 +106,12 @@ def plot_rewards(rewards):
     plt.legend()
     plt.show()
 
-# Plot the losses over time
-def plot_losses(policy_loss_all, value_loss_all):
+# Plot the losses over epsidoes
+def plot_losses(policy_loss, value_loss):
     plt.figure(figsize=(12, 6))
-    plt.plot(policy_loss_all, label='Policy Loss', alpha=0.7)
-    plt.plot(value_loss_all, label='Value Loss', alpha=0.7)
+    plt.plot(policy_loss, label='Policy Loss', alpha=0.7)
+    plt.plot(value_loss, label='Value Loss', alpha=0.7)
+    plt.xticks([])
     plt.xlabel('Episodes')
     plt.ylabel('Loss')
     plt.title('Advetage Actor-Critic')
@@ -126,12 +129,12 @@ def main():
     env = gym.make('CartPole-v1', render_mode=None)
 
     # Initialize policy network and optimizer
-    policy_net = PolicyNet(4, [256, 64, 32], 2)
+    policy_net = PolicyNet(4, [64, 64, 32], 2)
     optimizer = optim.AdamW(policy_net.parameters(), lr=LEARNING_RATE_POLICY)
     policy_loss_all = []
 
     # Initialize value network and optimizer
-    value_net = ValueNet(4, [512, 64, 32], 1)
+    value_net = ValueNet(4, [64, 64, 32], 1)
     value_optimizer = optim.AdamW(value_net.parameters(), lr=LEARNING_RATE_VALUE)
     value_loss_all = []
     
@@ -169,14 +172,18 @@ def main():
         value_loss_all.append(float(value_loss_eps))
         policy_loss_all.append(float(policy_loss_eps))
 
-        # Added average every 50 episodes
+        # Average the losses over the last 20 episodes
+        avg_steps = 20
+        policy_loss_avg = [np.mean(policy_loss_all[i:i+avg_steps]) for i in range(0, len(policy_loss_all), avg_steps)]
+        value_loss_avg = [np.mean(value_loss_all[i:i+avg_steps]) for i in range(0, len(value_loss_all), avg_steps)]
 
         # Log progress
         print(f"Episode {episode + 1}: Rewards={episode_rewards[-1]}")
 
     print("Training complete!")
+    os.system('echo -e "\a"')  # Terminal beep
     plot_rewards(episode_rewards)
-    plot_losses(policy_loss_all, value_loss_all)
+    plot_losses(policy_loss_avg, value_loss_avg)
 
 
 if __name__ == "__main__":
