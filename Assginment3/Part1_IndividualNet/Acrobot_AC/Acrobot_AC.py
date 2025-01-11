@@ -6,7 +6,7 @@ import torch.optim as optim
 import numpy as np
 import os
 from datetime import datetime
-import collections
+import optuna
 import matplotlib.pyplot as plt
 
 # Policy Network (Actor)
@@ -42,7 +42,6 @@ class ValueNetwork(nn.Module):
 
 # Training loop
 def train(env, policy, value_network, discount_factor, max_episodes, max_steps):
-
     episode_rewards = []
 
     for episode in range(max_episodes):
@@ -50,13 +49,13 @@ def train(env, policy, value_network, discount_factor, max_episodes, max_steps):
         state,_ = env.reset()
         state = torch.tensor(state, dtype=torch.float32).unsqueeze(0)
         cumulative_reward = 0
+
         for step in range(max_steps):
+
             action_probs = policy(state)
             action = torch.multinomial(action_probs, 1).item()
             next_state, reward, terminated, truncated, _ = env.step(action)
             done = terminated or truncated  # Properly handle episode termination
-
-
             next_state = torch.tensor(next_state, dtype=torch.float32).unsqueeze(0)
 
             current_value = value_network(state)
@@ -80,20 +79,15 @@ def train(env, policy, value_network, discount_factor, max_episodes, max_steps):
             state = next_state
             cumulative_reward += reward
 
-
             if done:
-                episode_rewards.append( cumulative_reward)
+                episode_rewards.append(cumulative_reward)
                 print(f"Episode {episode} Reward: {cumulative_reward}")
-                if  episode>100 and np.mean(episode_rewards[-100:]) > -100:
 
-                    save_dir = "C:/Users/idogu/PycharmProjects/PythonProject/weights"
-                    os.makedirs(save_dir, exist_ok=True)
-                    torch.save(policy.state_dict(), os.path.join(save_dir, "acrobot_policy.pth"))
-                    torch.save(value_network.state_dict(), os.path.join(save_dir, "acrobot_value.pth"))
+                if episode > 100 and np.mean(episode_rewards[-100:]) > -100:
+                    torch.save(policy.state_dict(), "Assginment3/Part1_IndividualNet/Acrobot_AC/acrobot_policy.pth")
+                    torch.save(value_network.state_dict(), "Assginment3/Part1_IndividualNet/Acrobot_AC/acrobot_value.pth")
                     return episode_rewards
                 break
-
-
 
 
 def plot_multiple_rewards(rewards_list, hyperparams_list):
@@ -139,30 +133,52 @@ def plot_single_reward(episode_rewards, policy_lr, value_lr, discount_factor):
     plt.legend()
     plt.grid(True)
     plt.show()
-if __name__ == '__main__':
-    np.random.seed(23)
-    torch.manual_seed(23)
-    fine_tunining=False # to do fine tunning.
+
+
+# Optuna Objective Function
+def objective(trial):
+    policy_lr = trial.suggest_loguniform('policy_lr', 1e-5, 1e-2)
+    value_lr = trial.suggest_loguniform('value_lr', 1e-5, 1e-2)
+    discount_factor = trial.suggest_uniform('discount_factor', 0.9, 0.999)
 
     env = gym.make('Acrobot-v1')
-    if fine_tunining:
-        hyperparams_list = [
-            (0.001, 0.001, 0.99),
-            (0.0001, 0.0005, 0.99),
-            (0.001, 0.001, 0.95),
-            (0.005, 0.005, 0.99)
-        ]
+    policy = PolicyNetwork(state_size=6, action_size=3, learning_rate=policy_lr)
+    value_network = ValueNetwork(state_size=6, learning_rate=value_lr)
 
-        rewards_list = []
-        for policy_lr, value_lr, discount_factor in hyperparams_list:
-            policy = PolicyNetwork(state_size=6, action_size=3, learning_rate=policy_lr)
-            value_network = ValueNetwork(state_size=6, learning_rate=value_lr)
-            rewards = train(env, policy, value_network, discount_factor, max_episodes=1500, max_steps=501)
-            rewards_list.append(rewards)
-        plot_multiple_rewards(rewards_list, hyperparams_list)
+    average_reward = np.mean(train(env, policy, value_network, discount_factor, max_episodes=500, max_steps=501))
+    return average_reward
+
+
+def main():
+    np.random.seed(23)
+    torch.manual_seed(23)
+    fine_tunining=False # Activate optuna.
+    #rewards_list = []
+
+    if fine_tunining:
+        # Create the Optuna study and optimize the objective function
+        study = optuna.create_study(direction='maximize')
+        study.optimize(objective, n_trials=50)
+
+        # Print the best hyperparameters
+        print("Best hyperparameters:", study.best_params)
+        print("Best reward:", study.best_value)
+
+        # Visualize the study results
+        optuna.visualization.matplotlib.plot_optimization_history(study).show()
+        optuna.visualization.matplotlib.plot_param_importances(study).show()
+
+        #rewards = train(env, policy, value_network, discount_factor, max_episodes=1500, max_steps=501)
+        #rewards_list.append(rewards)
+        #plot_multiple_rewards(rewards_list, hyperparams_list)
+
     else:
+        env = gym.make('Acrobot-v1')
         policy = PolicyNetwork(state_size=6, action_size=3, learning_rate=0.001)
         value_network = ValueNetwork(state_size=6, learning_rate=0.001)
-        rewards=train(env, policy, value_network, discount_factor=0.99, max_episodes=1500, max_steps=501)
+        rewards = train(env, policy, value_network, discount_factor=0.99, max_episodes=1500, max_steps=501)
         plot_single_reward(rewards, policy_lr=0.001, value_lr=0.001, discount_factor=0.99)
+
+if __name__ == '__main__':
+    main()
 
