@@ -9,6 +9,8 @@ from datetime import datetime
 import optuna
 import matplotlib.pyplot as plt
 
+fine_tunining=False  # Flag to activate hyperparameter fine-tuning using Optuna
+ 
 # Policy Network (Actor)
 class PolicyNetwork(nn.Module):
     def __init__(self, state_size, action_size, learning_rate):
@@ -84,8 +86,9 @@ def train(env, policy, value_network, discount_factor, max_episodes, max_steps):
                 print(f"Episode {episode} Reward: {cumulative_reward}")
 
                 if episode > 100 and np.mean(episode_rewards[-100:]) > -100:
-                    torch.save(policy.state_dict(), "Assginment3/Part1_IndividualNet/Acrobot_AC/acrobot_policy.pth")
-                    torch.save(value_network.state_dict(), "Assginment3/Part1_IndividualNet/Acrobot_AC/acrobot_value.pth")
+                    if fine_tunining:
+                        torch.save(policy.state_dict(), "Assginment3/Part1_IndividualNet/Acrobot_AC/acrobot_policy.pth")
+                        torch.save(value_network.state_dict(), "Assginment3/Part1_IndividualNet/Acrobot_AC/acrobot_value.pth")
                     return episode_rewards
                 break
 
@@ -152,7 +155,6 @@ def objective(trial):
 def main():
     np.random.seed(23)
     torch.manual_seed(23)
-    fine_tunining=False # Activate optuna.
     #rewards_list = []
 
     if fine_tunining:
