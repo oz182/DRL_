@@ -13,6 +13,12 @@ import sklearn
 
 # Best hyperparameters: {'policy_lr': 0.005582963305227242, 'value_lr': 0.0006112590022937452, 'discount_factor': 0.9792188226037197}
 # Best reward: -109.30097087378641
+
+# Last try that we have a plot of:
+# Best is trial 24 with value: -111.11650485436893.
+# Best hyperparameters: {'policy_lr': 0.0011435182467994243, 'value_lr': 0.0005850808192221598, 'discount_factor': 0.9876381948631086}
+# Best reward: -111.11650485436893
+
 fine_tunining=True  # Flag to activate hyperparameter fine-tuning using Optuna
  
 # Policy Network (Actor)
@@ -165,7 +171,7 @@ def main():
     if fine_tunining:
         # Create the Optuna study and optimize the objective function
         study = optuna.create_study(direction='maximize')
-        study.optimize(objective, n_trials=2)
+        study.optimize(objective, n_trials=50)
 
         # Print the best hyperparameters
         print("Best hyperparameters:", study.best_params)
