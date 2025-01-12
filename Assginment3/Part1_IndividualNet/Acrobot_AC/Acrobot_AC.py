@@ -9,10 +9,11 @@ from datetime import datetime
 import optuna
 import matplotlib.pyplot as plt
 from plotly.io import show
+import sklearn
 
 # Best hyperparameters: {'policy_lr': 0.005582963305227242, 'value_lr': 0.0006112590022937452, 'discount_factor': 0.9792188226037197}
 # Best reward: -109.30097087378641
-fine_tunining=False  # Flag to activate hyperparameter fine-tuning using Optuna
+fine_tunining=True  # Flag to activate hyperparameter fine-tuning using Optuna
  
 # Policy Network (Actor)
 class PolicyNetwork(nn.Module):
@@ -94,6 +95,7 @@ def train(env, policy, value_network, discount_factor, max_episodes, max_steps):
                         torch.save(value_network.state_dict(), "Assginment3/Part1_IndividualNet/Acrobot_AC/acrobot_value.pth")
                     return episode_rewards
                 break
+    return episode_rewards
 
 
 def plot_multiple_rewards(rewards_list, hyperparams_list):
@@ -163,7 +165,7 @@ def main():
     if fine_tunining:
         # Create the Optuna study and optimize the objective function
         study = optuna.create_study(direction='maximize')
-        study.optimize(objective, n_trials=50)
+        study.optimize(objective, n_trials=2)
 
         # Print the best hyperparameters
         print("Best hyperparameters:", study.best_params)
@@ -171,9 +173,8 @@ def main():
 
         # Visualize the study results
         fig1 = optuna.visualization.matplotlib.plot_optimization_history(study)
-        show(fig1)
         fig2 = optuna.visualization.matplotlib.plot_param_importances(study)
-        show(fig2)
+        plt.show()
 
         #rewards = train(env, policy, value_network, discount_factor, max_episodes=1500, max_steps=501)
         #rewards_list.append(rewards)

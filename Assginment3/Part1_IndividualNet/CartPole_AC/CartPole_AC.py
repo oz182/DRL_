@@ -5,8 +5,12 @@ import torch.optim as optim
 import numpy as np
 import os
 from datetime import datetime
-
 import matplotlib.pyplot as plt
+import optuna
+from plotly.io import show
+import sklearn
+
+fine_tunining=False  # Flag to activate hyperparameter fine-tuning using Optuna
 
 # Policy Network (Actor)
 class PolicyNetwork(nn.Module):
@@ -108,33 +112,63 @@ def train(env, policy, value_network, discount_factor, max_episodes, max_steps):
             if done:
                 episode_rewards.append(cumulative_reward)
                 print(f"Episode {episode} Reward: {cumulative_reward}")
+
                 if episode > 100 and np.mean(episode_rewards[-100:]) > 475:
-                    save_dir = "C:/Users/idogu/PycharmProjects/PythonProject/weights"
-                    os.makedirs(save_dir, exist_ok=True)
-                    torch.save(policy.state_dict(), os.path.join(save_dir, "cartpole_policy.pth"))
-                    torch.save(value_network.state_dict(), os.path.join(save_dir, "cartpole_value.pth"))
+                    if fine_tunining:
+                        torch.save(policy.state_dict(), "Assginment3/Part1_IndividualNet/CartPole_AC/cartpole_policy.pth")
+                        torch.save(value_network.state_dict(), "Assginment3/Part1_IndividualNet/CartPole_AC/cartpole_value.pth")
                     return episode_rewards
                 break
+    return episode_rewards
 
 
-
-
-if __name__ == '__main__':
-    np.random.seed(23)
-    torch.manual_seed(23)
-    fine_tunining=False
-
+# Optuna Objective Function
+def objective(trial):
+    policy_lr = trial.suggest_loguniform('policy_lr', 1e-5, 1e-2)
+    value_lr = trial.suggest_loguniform('value_lr', 1e-5, 1e-2)
+    discount_factor = trial.suggest_uniform('discount_factor', 0.9, 0.999)
 
     env = gym.make('CartPole-v1')
+    policy = PolicyNetwork(state_size=6, action_size=3, learning_rate=policy_lr)
+    value_network = ValueNetwork(state_size=6, learning_rate=value_lr)
 
+    average_reward = np.mean(train(env, policy, value_network, discount_factor, max_episodes=500, max_steps=501))
+    return average_reward
+
+
+def main():
+    np.random.seed(23)
+    torch.manual_seed(23)
 
     if fine_tunining:
-        pass
+        # Create the Optuna study and optimize the objective function
+        study = optuna.create_study(direction='maximize')
+        study.optimize(objective, n_trials=50)
+
+        # Print the best hyperparameters
+        print("Best hyperparameters:", study.best_params)
+        print("Best reward:", study.best_value)
+
+        # Visualize the study results
+        fig1 = optuna.visualization.matplotlib.plot_optimization_history(study)
+        fig2 = optuna.visualization.matplotlib.plot_param_importances(study)
+        plt.show()
+
+        #rewards = train(env, policy, value_network, discount_factor, max_episodes=1500, max_steps=501)
+        #rewards_list.append(rewards)
+        #plot_multiple_rewards(rewards_list, hyperparams_list)
     else:
+        env = gym.make('CartPole-v1')
         policy = PolicyNetwork(state_size=6, action_size=3, learning_rate=0.0001)
         value_network = ValueNetwork(state_size=6, learning_rate=0.0005)
         rewards = train(env, policy, value_network, discount_factor=0.99, max_episodes=1500, max_steps=501)
         plot_single_reward(rewards, policy_lr=0.0001, value_lr=0.0005, discount_factor=0.99)
+
+
+
+if __name__ == '__main__':
+    main()
+
 
 
 
