@@ -8,6 +8,7 @@ import os
 from datetime import datetime
 import optuna
 import matplotlib.pyplot as plt
+from plotly.io import show
 
 # Best hyperparameters: {'policy_lr': 0.005582963305227242, 'value_lr': 0.0006112590022937452, 'discount_factor': 0.9792188226037197}
 # Best reward: -109.30097087378641
@@ -169,8 +170,10 @@ def main():
         print("Best reward:", study.best_value)
 
         # Visualize the study results
-        optuna.visualization.matplotlib.plot_optimization_history(study).show()
-        optuna.visualization.matplotlib.plot_param_importances(study).show()
+        fig1 = optuna.visualization.matplotlib.plot_optimization_history(study)
+        show(fig1)
+        fig2 = optuna.visualization.matplotlib.plot_param_importances(study)
+        show(fig2)
 
         #rewards = train(env, policy, value_network, discount_factor, max_episodes=1500, max_steps=501)
         #rewards_list.append(rewards)
