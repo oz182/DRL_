@@ -8,6 +8,11 @@ import os
 from datetime import datetime
 import collections
 import matplotlib.pyplot as plt
+import optuna
+from plotly.io import show
+import sklearn
+
+fine_tunining=False  # Flag to activate hyperparameter fine-tuning using Optuna
 
 # Policy Network (Actor)
 class PolicyNetwork(nn.Module):
@@ -35,7 +40,6 @@ class PolicyNetwork(nn.Module):
         return  action.detach().numpy(), dist.log_prob(action)
 
 
-
     # Value Network (Critic)
 class ValueNetwork(nn.Module):
     def __init__(self, state_size, learning_rate):
@@ -50,6 +54,7 @@ class ValueNetwork(nn.Module):
         x = torch.relu(self.fc2(x))
         output = self.fc3(x)
         return output
+
 
 def pad_with_zeros(v, pad_size):
     v = np.asarray(v, dtype=np.float32)  # Ensure v is a NumPy array
@@ -77,6 +82,7 @@ def plot_single_reward(episode_rewards, policy_lr, value_lr, discount_factor):
     plt.grid(True)
     plt.show()
 
+
 # Training loop
 def train(env, policy, value_network, discount_factor, max_episodes, max_steps):
 
@@ -84,17 +90,17 @@ def train(env, policy, value_network, discount_factor, max_episodes, max_steps):
 
     for episode in range(max_episodes):
 
-
         state,_ = env.reset()
         state = pad_with_zeros(state, 6 -  2)
         state = torch.tensor(state, dtype=torch.float32)
 
         cumulative_reward = 0
+
         for step in range(max_steps):
             action,log_prob = policy.get_action(state)
-            next_state, reward, terminated, truncated, _ = env.step(action)
+            action = action[0]
+            next_state, reward, terminated, truncated, _ = env.step([action])
             done = terminated or truncated  # Properly handle episode termination
-
 
             reward = torch.tensor(reward, dtype=torch.float32)
             next_state = pad_with_zeros(next_state, 6 -  2)
@@ -112,7 +118,6 @@ def train(env, policy, value_network, discount_factor, max_episodes, max_steps):
             value_network.optimizer.step()
 
             # Update Policy Network
-
             policy_loss = -log_prob * td_error.detach()
             policy.optimizer.zero_grad()
             policy_loss.backward()
@@ -121,34 +126,58 @@ def train(env, policy, value_network, discount_factor, max_episodes, max_steps):
             state = next_state
             cumulative_reward += reward
 
-            if step % 300==0:
-                env.render()
-
-
-            if done or step==200:
+            if done or step == 200:
                 episode_rewards.append( cumulative_reward)
                 print(f"Episode {episode} Reward: {cumulative_reward}")
+                if fine_tunining:
+                    torch.save(policy.state_dict(), "Assginment3/Part1_IndividualNet/MountainCar_AC/mountain_policy.pth")
+                    torch.save(value_network.state_dict(), "Assginment3/Part1_IndividualNet/MountainCar_AC/mountain_value.pth")
                 break
-    save_dir = "C:/Users/idogu/PycharmProjects/PythonProject/weights"
-    os.makedirs(save_dir, exist_ok=True)
-    torch.save(policy.state_dict(), os.path.join(save_dir, "mountaincar_policy.pth"))
-    torch.save(value_network.state_dict(), os.path.join(save_dir, "mountaincar_value.pth"))
     return episode_rewards
 
-if __name__ == '__main__':
+
+# Optuna Objective Function
+def objective(trial):
+    policy_lr = trial.suggest_loguniform('policy_lr', 1e-5, 1e-2)
+    value_lr = trial.suggest_loguniform('value_lr', 1e-5, 1e-2)
+    discount_factor = trial.suggest_uniform('discount_factor', 0.9, 0.999)
+
+    env = gym.make('MountainCarContinuous-v0')
+    policy = PolicyNetwork(state_size=6, action_size=3, learning_rate=policy_lr)
+    value_network = ValueNetwork(state_size=6, learning_rate=value_lr)
+
+    average_reward = np.mean(train(env, policy, value_network, discount_factor, max_episodes=500, max_steps=501))
+    return average_reward
+
+def test(policy, value_network):
+    env = gym.make('MountainCarContinuous-v0', render_mode='human')
+    rewards = train(env, policy, value_network, discount_factor=0.99, max_episodes=1, max_steps=400)
+    #plot_single_reward(rewards, policy_lr=0.00001, value_lr=0.00055, discount_factor=0.99)
+
+def main():
     np.random.seed(23)
     torch.manual_seed(23)
-    env = gym.make('MountainCarContinuous-v0', render_mode='human')
-    fine_tuning=False
 
+    if fine_tunining:
+        study = optuna.create_study(direction='maximize')
+        study.optimize(objective, n_trials=100)
+        # Print the best hyperparameters
+        print("Best hyperparameters:", study.best_params)
+        print("Best reward:", study.best_value)
 
+        # Visualize the study results
+        fig1 = optuna.visualization.matplotlib.plot_optimization_history(study)
+        fig2 = optuna.visualization.matplotlib.plot_param_importances(study)
+        plt.show()
 
-
-    if fine_tuning:
-        pass
     else:
+        env = gym.make('MountainCarContinuous-v0', render_mode=None)
         policy = PolicyNetwork(state_size=6, action_size=3, learning_rate=0.00005)
         value_network = ValueNetwork(state_size=6, learning_rate=0.0001)
-        rewards = train(env, policy, value_network, discount_factor=0.99, max_episodes=1000, max_steps=999)
+        rewards = train(env, policy, value_network, discount_factor=0.99, max_episodes=150, max_steps=999)
+        test(policy, value_network)
         plot_single_reward(rewards, policy_lr=0.00001, value_lr=0.00055, discount_factor=0.99)
 
+
+if __name__ == '__main__':
+    main()
