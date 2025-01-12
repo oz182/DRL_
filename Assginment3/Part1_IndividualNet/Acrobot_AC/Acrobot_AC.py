@@ -9,6 +9,8 @@ from datetime import datetime
 import optuna
 import matplotlib.pyplot as plt
 
+# Best hyperparameters: {'policy_lr': 0.005582963305227242, 'value_lr': 0.0006112590022937452, 'discount_factor': 0.9792188226037197}
+# Best reward: -109.30097087378641
 fine_tunining=False  # Flag to activate hyperparameter fine-tuning using Optuna
  
 # Policy Network (Actor)
