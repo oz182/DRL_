@@ -12,6 +12,10 @@ import sklearn
 
 fine_tunining=True  # Flag to activate hyperparameter fine-tuning using Optuna
 
+#Best is trial 29 with value: 209.044.
+#Best hyperparameters: {'policy_lr': 0.000490641507278229, 'value_lr': 0.0016361417772812591, 'discount_factor': 0.9916757486832062}
+#Best reward: 209.044
+
 # Policy Network (Actor)
 class PolicyNetwork(nn.Module):
     def __init__(self, state_size, action_size, learning_rate):
