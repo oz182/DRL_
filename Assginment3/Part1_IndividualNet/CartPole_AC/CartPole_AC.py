@@ -10,7 +10,7 @@ import optuna
 from plotly.io import show
 import sklearn
 
-fine_tunining=False  # Flag to activate hyperparameter fine-tuning using Optuna
+fine_tunining=True  # Flag to activate hyperparameter fine-tuning using Optuna
 
 # Policy Network (Actor)
 class PolicyNetwork(nn.Module):
