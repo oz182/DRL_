@@ -11,8 +11,10 @@ import matplotlib.pyplot as plt
 import optuna
 from plotly.io import show
 import sklearn
+import torch.nn.functional as F
 
 fine_tunining=False  # Flag to activate hyperparameter fine-tuning using Optuna
+burn_in = False  # Flag to indicate whether to burn-in effect is active
 
 # Policy Network (Actor)
 class PolicyNetwork(nn.Module):
@@ -21,23 +23,32 @@ class PolicyNetwork(nn.Module):
         self.fc1 = nn.Linear(state_size, 16)
         self.fc2 = nn.Linear(16, 16)
         self.fc3=nn.Linear(16, action_size)
-
         self.optimizer = optim.Adam(self.parameters(), lr=learning_rate)
 
     def forward(self, state):
         x = torch.relu(self.fc1(state))
         x = torch.relu(self.fc2(x))
-        output= self.fc3(x)
+        output = self.fc3(x)
         return output[:, :2]
 
-    def get_action(self, state):
+    def get_action(self, state): # Return action and log(prob(action))
         x = self.forward(state)
         std=torch.exp(x[:,1])
         dist = torch.distributions.Normal(x[:,0], std)
         probs=dist.sample()
         action=torch.tanh_(probs)
+        return action.detach().numpy(), dist.log_prob(action)
 
-        return  action.detach().numpy(), dist.log_prob(action)
+    def reset_parameters(self):
+        nn.init.xavier_normal_(self.fc1.weight)
+        nn.init.xavier_normal_(self.fc2.weight)
+        nn.init.xavier_normal_(self.fc3.weight)
+        if self.fc1.bias is not None:
+            nn.init.zeros_(self.fc1.bias)
+        if self.fc2.bias is not None:
+            nn.init.zeros_(self.fc2.bias)
+        if self.fc3.bias is not None:
+            nn.init.zeros_(self.fc3.bias)
 
 
     # Value Network (Critic)
@@ -54,6 +65,17 @@ class ValueNetwork(nn.Module):
         x = torch.relu(self.fc2(x))
         output = self.fc3(x)
         return output
+
+    def reset_parameters(self):
+        nn.init.xavier_normal_(self.fc1.weight)
+        nn.init.xavier_normal_(self.fc2.weight)
+        nn.init.xavier_normal_(self.fc3.weight)
+        if self.fc1.bias is not None:
+            nn.init.zeros_(self.fc1.bias)
+        if self.fc2.bias is not None:
+            nn.init.zeros_(self.fc2.bias)
+        if self.fc3.bias is not None:
+            nn.init.zeros_(self.fc3.bias)
 
 
 def pad_with_zeros(v, pad_size):
@@ -88,7 +110,9 @@ def train(env, policy, value_network, discount_factor, max_episodes, max_steps):
 
     episode_rewards = []
 
-    for episode in range(max_episodes):
+    episode = 0
+
+    while (episode < max_episodes):
 
         state,_ = env.reset()
         state = pad_with_zeros(state, 6 -  2)
@@ -98,10 +122,8 @@ def train(env, policy, value_network, discount_factor, max_episodes, max_steps):
 
         for step in range(max_steps):
             action,log_prob = policy.get_action(state)
-            action = action[0]
-            next_state, reward, terminated, truncated, _ = env.step([action])
+            next_state, reward, terminated, truncated, _ = env.step(action)
             done = terminated or truncated  # Properly handle episode termination
-
             reward = torch.tensor(reward, dtype=torch.float32)
             next_state = pad_with_zeros(next_state, 6 -  2)
             next_state = torch.tensor(next_state, dtype=torch.float32)
@@ -126,13 +148,23 @@ def train(env, policy, value_network, discount_factor, max_episodes, max_steps):
             state = next_state
             cumulative_reward += reward
 
-            if done or step == 200:
-                episode_rewards.append( cumulative_reward)
+            if done or step == 999:
+                episode_rewards.append(cumulative_reward)
                 print(f"Episode {episode} Reward: {cumulative_reward}")
                 if fine_tunining:
                     torch.save(policy.state_dict(), "Assginment3/Part1_IndividualNet/MountainCar_AC/mountain_policy.pth")
                     torch.save(value_network.state_dict(), "Assginment3/Part1_IndividualNet/MountainCar_AC/mountain_value.pth")
                 break
+        
+        if ((max(episode_rewards) < 1) & (episode > 3)):
+            episode = 0
+            policy.reset_parameters()
+            value_network.reset_parameters()
+            print("Resetting the weights")
+            episode_rewards = []
+        
+        episode += 1
+
     return episode_rewards
 
 
@@ -155,8 +187,8 @@ def test(policy, value_network):
     #plot_single_reward(rewards, policy_lr=0.00001, value_lr=0.00055, discount_factor=0.99)
 
 def main():
-    np.random.seed(23)
-    torch.manual_seed(23)
+    #np.random.seed(23)
+    #torch.manual_seed(23)
 
     if fine_tunining:
         study = optuna.create_study(direction='maximize')
@@ -172,9 +204,9 @@ def main():
 
     else:
         env = gym.make('MountainCarContinuous-v0', render_mode=None)
-        policy = PolicyNetwork(state_size=6, action_size=3, learning_rate=0.00005)
-        value_network = ValueNetwork(state_size=6, learning_rate=0.0001)
-        rewards = train(env, policy, value_network, discount_factor=0.99, max_episodes=150, max_steps=999)
+        policy = PolicyNetwork(state_size=6, action_size=3, learning_rate=0.0005)
+        value_network = ValueNetwork(state_size=6, learning_rate=0.0005)
+        rewards = train(env, policy, value_network, discount_factor=0.99, max_episodes=1000, max_steps=999)
         test(policy, value_network)
         plot_single_reward(rewards, policy_lr=0.00001, value_lr=0.00055, discount_factor=0.99)
 
