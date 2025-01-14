@@ -34,7 +34,12 @@ class PolicyNetwork(nn.Module):
     def get_action(self, state): # Return action and log(prob(action))
         x = self.forward(state)
         std=torch.exp(x[:,1])
-        dist = torch.distributions.Normal(x[:,0], std)
+
+        try:
+            dist = torch.distributions.Normal(x[:,0], std)
+        except:
+            dist = torch.distributions.Normal(0.0, 0.1)
+
         probs=dist.sample()
         action=torch.tanh_(probs)
         return action.detach().numpy(), dist.log_prob(action)
@@ -125,6 +130,8 @@ def train(env, policy, value_network, discount_factor, max_episodes, max_steps):
             next_state, reward, terminated, truncated, _ = env.step(action)
             done = terminated or truncated  # Properly handle episode termination
             reward = torch.tensor(reward, dtype=torch.float32)
+
+            #next_state[1] *= 1.006
             next_state = pad_with_zeros(next_state, 6 -  2)
             next_state = torch.tensor(next_state, dtype=torch.float32)
 
@@ -156,7 +163,7 @@ def train(env, policy, value_network, discount_factor, max_episodes, max_steps):
                     torch.save(value_network.state_dict(), "Assginment3/Part1_IndividualNet/MountainCar_AC/mountain_value.pth")
                 break
         
-        if ((max(episode_rewards) < 1) & (episode > 3)):
+        if ((max(episode_rewards) < 1) & (episode > 1)):
             episode = 0
             policy.reset_parameters()
             value_network.reset_parameters()
@@ -205,8 +212,8 @@ def main():
     else:
         env = gym.make('MountainCarContinuous-v0', render_mode=None)
         policy = PolicyNetwork(state_size=6, action_size=3, learning_rate=0.0005)
-        value_network = ValueNetwork(state_size=6, learning_rate=0.0005)
-        rewards = train(env, policy, value_network, discount_factor=0.99, max_episodes=1000, max_steps=999)
+        value_network = ValueNetwork(state_size=6, learning_rate=0.0001)
+        rewards = train(env, policy, value_network, discount_factor=0.995, max_episodes=1000, max_steps=999)
         test(policy, value_network)
         plot_single_reward(rewards, policy_lr=0.00001, value_lr=0.00055, discount_factor=0.99)
 
