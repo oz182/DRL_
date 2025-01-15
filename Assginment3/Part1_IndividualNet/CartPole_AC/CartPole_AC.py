@@ -12,6 +12,10 @@ import sklearn
 
 fine_tunining=True  # Flag to activate hyperparameter fine-tuning using Optuna
 
+#Best is trial 103 with value: 298.449.
+#Best hyperparameters: {'policy_lr': 0.0005300702672331444, 'value_lr': 0.0007898088475083023, 'discount_factor': 0.9932619487803604}
+#Best reward: 298.449
+
 # Policy Network (Actor)
 class PolicyNetwork(nn.Module):
     def __init__(self, state_size, action_size, learning_rate):
@@ -124,15 +128,15 @@ def train(env, policy, value_network, discount_factor, max_episodes, max_steps):
 
 # Optuna Objective Function
 def objective(trial):
-    policy_lr = trial.suggest_loguniform('policy_lr', 1e-5, 1e-2)
-    value_lr = trial.suggest_loguniform('value_lr', 1e-5, 1e-2)
-    discount_factor = trial.suggest_uniform('discount_factor', 0.9, 0.999)
+    policy_lr = trial.suggest_loguniform('policy_lr', 1e-5, 1e-3)
+    value_lr = trial.suggest_loguniform('value_lr', 1e-5, 1e-3)
+    discount_factor = trial.suggest_uniform('discount_factor', 0.93, 0.999)
 
     env = gym.make('CartPole-v1')
     policy = PolicyNetwork(state_size=6, action_size=3, learning_rate=policy_lr)
     value_network = ValueNetwork(state_size=6, learning_rate=value_lr)
 
-    average_reward = np.mean(train(env, policy, value_network, discount_factor, max_episodes=500, max_steps=501))
+    average_reward = np.mean(train(env, policy, value_network, discount_factor, max_episodes=1000, max_steps=501))
     return average_reward
 
 
@@ -143,7 +147,7 @@ def main():
     if fine_tunining:
         # Create the Optuna study and optimize the objective function
         study = optuna.create_study(direction='maximize')
-        study.optimize(objective, n_trials=50)
+        study.optimize(objective, n_trials=130)
 
         # Print the best hyperparameters
         print("Best hyperparameters:", study.best_params)
