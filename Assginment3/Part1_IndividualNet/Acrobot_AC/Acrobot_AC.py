@@ -11,13 +11,9 @@ import matplotlib.pyplot as plt
 from plotly.io import show
 import sklearn
 
-# Best hyperparameters: {'policy_lr': 0.005582963305227242, 'value_lr': 0.0006112590022937452, 'discount_factor': 0.9792188226037197}
-# Best reward: -109.30097087378641
-
-# Last try that we have a plot of:
-# Best is trial 24 with value: -111.11650485436893.
-# Best hyperparameters: {'policy_lr': 0.0011435182467994243, 'value_lr': 0.0005850808192221598, 'discount_factor': 0.9876381948631086}
-# Best reward: -111.11650485436893
+#Best is trial 86 with value: -108.3883495145631.
+#Best hyperparameters: {'policy_lr': 0.000773030869420671, 'value_lr': 0.0007890187704703474, 'discount_factor': 0.9952315256686592}
+#Best reward: -108.3883495145631
 
 fine_tunining=True  # Flag to activate hyperparameter fine-tuning using Optuna
  
@@ -151,9 +147,9 @@ def plot_single_reward(episode_rewards, policy_lr, value_lr, discount_factor):
 
 # Optuna Objective Function
 def objective(trial):
-    policy_lr = trial.suggest_loguniform('policy_lr', 1e-5, 1e-2)
-    value_lr = trial.suggest_loguniform('value_lr', 1e-5, 1e-2)
-    discount_factor = trial.suggest_uniform('discount_factor', 0.9, 0.999)
+    policy_lr = trial.suggest_loguniform('policy_lr', 1e-5, 1e-3)
+    value_lr = trial.suggest_loguniform('value_lr', 1e-5, 1e-3)
+    discount_factor = trial.suggest_uniform('discount_factor', 0.93, 0.999)
 
     env = gym.make('Acrobot-v1')
     policy = PolicyNetwork(state_size=6, action_size=3, learning_rate=policy_lr)
@@ -171,7 +167,7 @@ def main():
     if fine_tunining:
         # Create the Optuna study and optimize the objective function
         study = optuna.create_study(direction='maximize')
-        study.optimize(objective, n_trials=50)
+        study.optimize(objective, n_trials=120)
 
         # Print the best hyperparameters
         print("Best hyperparameters:", study.best_params)
