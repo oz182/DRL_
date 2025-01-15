@@ -13,7 +13,7 @@ import sklearn
 
 #Best is trial 86 with value: -108.3883495145631.
 #Best hyperparameters: {'policy_lr': 0.000773030869420671, 'value_lr': 0.0007890187704703474, 'discount_factor': 0.9952315256686592}
-#Best reward: -108.3883495145631
+# Best reward: -108.3883495145631
 
 fine_tunining=True  # Flag to activate hyperparameter fine-tuning using Optuna
  
