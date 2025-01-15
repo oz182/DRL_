@@ -138,7 +138,7 @@ def train(env, policy, value_network, discount_factor, max_episodes, max_steps):
 if __name__ == '__main__':
     np.random.seed(23)
     torch.manual_seed(23)
-    env = gym.make('MountainCarContinuous-v0', render_mode='human')
+    env = gym.make('MountainCarContinuous-v0', render_mode=None)
     fine_tuning=False
 
 
