@@ -11,15 +11,10 @@ import matplotlib.pyplot as plt
 from plotly.io import show
 import sklearn
 
-<<<<<<< HEAD
-# Best hyperparameters: {'policy_lr': 0.005582963305227242, 'value_lr': 0.0006112590022937452, 'discount_factor': 0.9792188226037197}
-# Best reward: -109.30097087378641
-=======
 #Best is trial 86 with value: -108.3883495145631.
 #Best hyperparameters: {'policy_lr': 0.000773030869420671, 'value_lr': 0.0007890187704703474, 'discount_factor': 0.9952315256686592}
 # Best reward: -108.3883495145631
 
->>>>>>> 1a74212f79da90a00ad770cfa6f0b279211eeeec
 fine_tunining=True  # Flag to activate hyperparameter fine-tuning using Optuna
  
 # Policy Network (Actor)
@@ -172,11 +167,8 @@ def main():
     if fine_tunining:
         # Create the Optuna study and optimize the objective function
         study = optuna.create_study(direction='maximize')
-<<<<<<< HEAD
-        study.optimize(objective, n_trials=2)
-=======
+
         study.optimize(objective, n_trials=120)
->>>>>>> 1a74212f79da90a00ad770cfa6f0b279211eeeec
 
         # Print the best hyperparameters
         print("Best hyperparameters:", study.best_params)
